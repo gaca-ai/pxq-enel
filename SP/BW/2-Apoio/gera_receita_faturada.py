@@ -18,10 +18,22 @@ Regras (README, secao 5.1):
   parcela TUSD e os sem parcela (inclusive subvencoes) sao repartidos entre D e E na
   proporcao da receita TUSD (ou total) do bloco 2 da mesma opcao x classe.
 - ZQC237 (Encargo da conta COVID) entra em CDE CONTAS, unidade E.
-- Reativos, ultrapassagem, substituicao tributaria, energia compensada e demais nao
-  tarifaveis ficam fora do layout e aparecem na aba Conferencia.
+- UD/ER (coluna nova, antes de PIS/COFINS): ultrapassagem de demanda e energia reativa
+  (ultrapassagem, UFER, UFDR, demanda e energia reativa excedente).
+- Outros (coluna nova, antes de PIS/COFINS): os demais nao tarifaveis (acertos da CCEE,
+  energia compensada, atualizacao de montante, ERCAP, desconto ex-funcionario, encargo de
+  conexao, substituicao tributaria - debito e credito se anulam por classe) e o residuo
+  sem item tarifario do bloco 2.
+- Unidade de UD/ER e Outros pelo proprio lancamento: demanda, potencia, kW, UFDR e conexao
+  vao para D; o restante para E.
+- Com isso o layout reproduz a receita total do pxq (BW + SD), a base do informe de gestao.
 - SCEE GD1/GD2 ficam vazios: o BW nao identifica a instalacao no SCEE; o movimento
   desses clientes fica em CATIVO (README 6.1).
+- Classe principal "Nao atribuido": categoria residencial vai para Residencial, ou para
+  Residencial Baixa Renda quando todas as subclasses listadas sao de baixa renda ou
+  desconto social.
+- Linha E sem correspondente no modelo (GERACAO): o valor vai para Outros da linha D da mesma
+  opcao; o MWh nao e gravado e aparece em nota na aba Conferencia.
 - Valores em R$ mil; so as linhas com valor sao gravadas.
 """
 import os
@@ -50,6 +62,9 @@ CLASSE = {"Residencial": "Residencial", "Industrial": "Industrial", "Comercial, 
           "Rural": "Rural", "Poder Público": "Poderes Públicos", "Iluminação Pública": "Iluminação Pública",
           "Serviço Público": "Serviços Públicos", "Consumo Próprio": "Consumo Próprio"}
 COL_ID = ["Responsável", "Competência", "TipoFaturamento", "OpcaoCompra", "Classe", "Unidade"]
+COL_UDER, COL_OUTROS = "UD/ER", "Outros"                          # new columns, before PIS/COFINS
+PADRAO_UDER = "ULTRAPA|UFER|UFDR|REATIV"
+PADRAO_UNID_D = "DEMANDA|POTÊNCIA|POTENCIA|\\(KW\\)|UFDR|CONEX"
 
 
 def norm(texto):
@@ -78,7 +93,15 @@ def le_modelo():
     return wb, cab, de_para, grade
 
 
-def classe_modelo(classe_principal, subclasse):
+def classe_modelo(classe_principal, subclasse, categoria=None):
+    # "Nao atribuido" main class: residential tariff category -> Residencial, or Baixa Renda when
+    # every listed subclass is a low-income / social-discount one
+    if norm(classe_principal) == "NAO ATRIBUIDO":
+        if "RESIDENCIAL" not in norm(categoria):
+            return None
+        partes = [p.strip() for p in str(subclasse).split("|") if p.strip() and p.strip() != "nan"]
+        so_br = bool(partes) and all(any(b in p for b in SUBCLASSES_BAIXA_RENDA) for p in partes)
+        return "Residencial Baixa Renda" if so_br else "Residencial"
     if classe_principal == "Residencial" and any(s in str(subclasse) for s in SUBCLASSES_BAIXA_RENDA):
         return "Residencial Baixa Renda"
     return CLASSE.get(classe_principal)
@@ -96,8 +119,9 @@ def converte(ref, wb, cab, de_para, grade):
     tar_ta = comp.loc[tar.index]                                   # same row order in both sheets
     tar["OPCAO"] = tar["Flag Cli.Liv./ Cat."].map(OPCAO)
     sd = tar["Source"] == "SD"
-    tar["CLASSE"] = [o if s else classe_modelo(c, sc) for o, s, c, sc in
-                     zip(tar["OPCAO"], sd, tar["Classe principal"], tar["Classe/Sub-classe"])]
+    tar["CLASSE"] = [o if s else classe_modelo(c, sc, ct) for o, s, c, sc, ct in
+                     zip(tar["OPCAO"], sd, tar["Classe principal"], tar["Classe/Sub-classe"],
+                         tar["Categoria tarifa"])]
     tar["UNIDADE"] = np.where(tar["Chave"].astype(str).str.endswith("kW"), "D", "E")
     tar["CONSUMO"] = np.where(tar["UNIDADE"] == "D", tar["TOTAL DEMANDA"], tar["TOTAL CONSUMO"]) / 1000
     cols_comp = [c for c in be.columns if c.startswith("[2] ") and not c.startswith("[2] Total")]
@@ -116,26 +140,31 @@ def converte(ref, wb, cab, de_para, grade):
     sem_coluna = tar[[c for c in cols_comp if c[4:] not in de_para]].fillna(0.0).sum(axis=1)
     tar[cab["BASE FINANCEIRA"]] = tar["[2] Total FIN"].fillna(0.0)
     tar[cab["BASE CVA"]] = tar["[2] Total CVA"].fillna(0.0)
-    residuo_sem_ajuste = (tar["RECEITA DE FORNECIMENTO"] - tar["[2] Total TA"].fillna(0.0)).sum()
+    tar["RESIDUO"] = tar["RECEITA DE FORNECIMENTO"] - tar["[2] Total TA"].fillna(0.0)
     # TUSD and total TA by unit, used to split taxes between D and E
     tusd = [c for c in comp.columns if c.startswith("[2] TUSD")]
     tar["PESO_TUSD"] = tar_ta[tusd].fillna(0.0).sum(axis=1)
     tar["PESO_TOTAL"] = tar_ta["[2] Total TA"].fillna(0.0)
 
     valores = [c for c in cab.values() if c not in COL_ID]
+    pos = valores.index(cab["PIS/COFINS"])
+    valores[pos:pos] = [COL_UDER, COL_OUTROS]
     linhas = []
     fora = []                                                      # (category, detail, R$)
     ok_tar = tar["OPCAO"].notna() & tar["CLASSE"].notna()
     for (o, cl), r in tar[~ok_tar].groupby(["Flag Cli.Liv./ Cat.", "Classe principal"], dropna=False):
-        fora.append(("Classe/opcao sem correspondencia no modelo", f"{o} / {cl}", r["[2] Total TA"].sum()))
+        fora.append(("Classe/opcao sem correspondencia no modelo", f"{o} / {cl}",
+                     r["RECEITA DE FORNECIMENTO"].sum()))
     t = tar[ok_tar]
     blocos = [c for c in valores if c in t.columns]
     agg = t.groupby(["OPCAO", "CLASSE", "UNIDADE"])[blocos + ["PESO_TUSD", "PESO_TOTAL"]].sum()
+    residuo = t.groupby(["OPCAO", "CLASSE", "UNIDADE"])["RESIDUO"].sum()
 
     # ------------------------------------------------ non-tariff lines
     nt = nt.copy()
     nt["OPCAO"] = nt["Flag Cli.Liv./ Cat."].map(OPCAO)
-    nt["CLASSE"] = [classe_modelo(c, s) for c, s in zip(nt["Classe principal"], nt["Classe/Sub-classe"])]
+    nt["CLASSE"] = [classe_modelo(c, s, ct) for c, s, ct in
+                    zip(nt["Classe principal"], nt["Classe/Sub-classe"], nt["Categoria tarifa"])]
     mont = nt["Grp.estatísts.mont."].astype(str)
     quant = nt["Grp.estatísts.quant."].astype(str)
     tributo = nt["Operação principal"].astype(str).str.contains("R/#", regex=False)
@@ -147,19 +176,24 @@ def converte(ref, wb, cab, de_para, grade):
     nt["PARCELA"] = np.where(mont.str.endswith("- TE"), "TE",
                              np.where(mont.str.endswith("- TUSD"), "TUSD", "GERAL"))
     nt.loc[nt["COLUNA"].isin([cab["BANDEIRA"], cab["CDE CONTAS"]]), "PARCELA"] = "TE"
+    mont_up = mont.str.upper()
+    nt.loc[nt["COLUNA"].isna() & mont_up.str.contains(PADRAO_UDER), "COLUNA"] = COL_UDER
+    nt.loc[nt["COLUNA"].isna(), "COLUNA"] = COL_OUTROS
+    novas = nt["COLUNA"].isin([COL_UDER, COL_OUTROS])
+    nt.loc[novas, "PARCELA"] = np.where(mont_up[novas].str.contains(PADRAO_UNID_D), "UNID_D", "UNID_E")
 
     usa = nt["COLUNA"].notna() & nt["OPCAO"].notna() & nt["CLASSE"].notna()
     for g, r in nt[nt["COLUNA"].notna() & ~usa].groupby(["Flag Cli.Liv./ Cat.", "Classe principal"], dropna=False):
-        fora.append(("Tributo/bandeira com classe sem correspondencia", " / ".join(map(str, g)),
+        fora.append(("Nao tarifavel com classe sem correspondencia", " / ".join(map(str, g)),
                      r["RECEITA DE FORNECIMENTO"].sum()))
-    for g, r in nt[nt["COLUNA"].isna()].groupby("Grp.estatísts.mont.", dropna=False):
-        fora.append(("Nao tarifavel fora do layout", str(g), r["RECEITA DE FORNECIMENTO"].sum()))
 
     extra = {}
     for (o, cl, col, parc), v in (nt[usa].groupby(["OPCAO", "CLASSE", "COLUNA", "PARCELA"])
                                   ["RECEITA DE FORNECIMENTO"].sum().items()):
-        if parc == "TE":
+        if parc == "TE" or parc == "UNID_E":
             partes = {"E": 1.0}
+        elif parc == "UNID_D":
+            partes = {"D": 1.0}
         else:
             peso = "PESO_TUSD" if parc == "TUSD" else "PESO_TOTAL"
             w = {u: agg.loc[(o, cl, u), peso] if (o, cl, u) in agg.index else 0.0 for u in ("D", "E")}
@@ -167,6 +201,9 @@ def converte(ref, wb, cab, de_para, grade):
             partes = {u: w[u] / tot for u in w} if tot else {"E": 1.0}
         for u, p in partes.items():
             extra[(o, cl, u, col)] = extra.get((o, cl, u, col), 0.0) + v * p
+    for (o, cl, u), v in residuo.items():
+        if abs(v) > 0.005:
+            extra[(o, cl, u, COL_OUTROS)] = extra.get((o, cl, u, COL_OUTROS), 0.0) + v
 
     # ------------------------------------------------ assemble rows on the model grid
     extra_df = (pd.Series(extra, dtype=float).rename_axis(["OPCAO", "CLASSE", "UNIDADE", "COLUNA"])
@@ -176,10 +213,21 @@ def converte(ref, wb, cab, de_para, grade):
 
     competencia = dt.datetime(int(ref[:4]), int(ref[5:7]), 1)
     na_grade = {(op, cl, u) for _, op, cl, u in grade}
-    for chave, r in tabela.iterrows():
-        if chave not in na_grade:
-            fora.append(("Opcao x classe x unidade fora da grade do modelo", " / ".join(chave),
-                         r.drop(cab["CONSUMO"]).sum()))
+    for chave, r in list(tabela.iterrows()):
+        if chave in na_grade:
+            continue
+        valor = r.drop(cab["CONSUMO"]).sum()
+        alvo = (chave[0], chave[1], "D")
+        if chave[2] == "E" and alvo in na_grade:
+            # no E row in the model for this option (GERACAO): value goes to Outros of the D row;
+            # the MWh cannot be added to MW and is only reported
+            if alvo not in tabela.index:
+                tabela.loc[alvo, :] = 0.0
+            tabela.loc[alvo, COL_OUTROS] += valor
+            notas.append(f"{' / '.join(chave)} sem linha E no modelo: R$ {valor:,.2f} gravados em "
+                         f"Outros da linha D ({r[cab['CONSUMO']]:,.3f} MWh não gravados)")
+        else:
+            fora.append(("Opcao x classe x unidade fora da grade do modelo", " / ".join(chave), valor))
     for _, op, cl, u in grade:
         if (op, cl, u) in tabela.index:
             r = tabela.loc[(op, cl, u)]
@@ -189,6 +237,20 @@ def converte(ref, wb, cab, de_para, grade):
     # ------------------------------------------------ write output from the template
     wb = openpyxl.load_workbook(ARQ_MODELO)
     ws = wb["Receita Faturada"]
+    larguras = {c: ws.column_dimensions[openpyxl.utils.get_column_letter(c)].width
+                for c in range(1, ws.max_column + 1)}
+    c_pis = next(c for c in range(2, ws.max_column + 1) if ws.cell(3, c).value == cab["PIS/COFINS"])
+    ws.insert_cols(c_pis, 2)
+    for k, nome in enumerate([COL_UDER, COL_OUTROS]):
+        for r in (2, 3):
+            ws.cell(r, c_pis + k).value = ws.cell(r, c_pis + 2).value if r == 2 else nome
+            ws.cell(r, c_pis + k)._style = copy.copy(ws.cell(r, c_pis + 2)._style)
+        ws.cell(4, c_pis + k)._style = copy.copy(ws.cell(4, c_pis + 2)._style)
+    for c, w in larguras.items():                                 # shift the column widths
+        if w:
+            ws.column_dimensions[openpyxl.utils.get_column_letter(c if c < c_pis else c + 2)].width = w
+    ws.column_dimensions[openpyxl.utils.get_column_letter(c_pis)].width = 10
+    ws.column_dimensions[openpyxl.utils.get_column_letter(c_pis + 1)].width = 10
     estilos = [copy.copy(ws.cell(4, c)._style) for c in range(1, ws.max_column + 1)]
     ws.delete_rows(4, ws.max_row)
     col_de = {ws.cell(3, c).value: c for c in range(2, ws.max_column + 1)}
@@ -204,14 +266,13 @@ def converte(ref, wb, cab, de_para, grade):
         ws.cell(i, col_de["Competência"]).number_format = "dd/mm/yyyy"
 
     # ------------------------------------------------ reconciliation sheet (R$)
-    fora.append(("Grupos tarifaveis sem calculo (residuo nao ajustavel do bloco 2)", "", residuo_sem_ajuste))
     fora.append(("Componente BE sem coluna no modelo", "", sem_coluna.sum()))
     df_fora = pd.DataFrame(fora, columns=["Categoria", "Detalhe", "R$"])
     df_fora = df_fora[df_fora["R$"].abs() > 0.005]
     gravado = sum(sum(v for v in l[7:]) for l in linhas)
     resumo = pd.DataFrame([
         ("Receita total do pxq (BW + SD)", receita_total),
-        ("Gravado no layout (colunas I a AC)", gravado),
+        ("Gravado no layout (colunas I a AE)", gravado),
         ("Fora do layout (detalhe abaixo)", df_fora["R$"].sum()),
         ("Diferenca (deve ser zero)", receita_total - gravado - df_fora["R$"].sum()),
     ], columns=["Item", "R$"])
