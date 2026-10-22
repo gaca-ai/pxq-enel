@@ -429,3 +429,65 @@ Leitura:
 
 Detalhe completo em `3-Checks/consolidado_check_mr_camadas_2026-01_a_2026-05.xlsx` e, por opção
 de compra e subgrupo, em `3-Checks/consolidado_check_mr_bloco2_2026-01_a_2026-05.xlsx`.
+
+## 6. Pendências
+
+As pendências abertas do projeto estão na ata, [`sessions.md`](sessions.md), seção 1. Esta seção
+explica a que afeta diretamente a entrega.
+
+### 6.1 SCEE GD1 e GD2 no layout Receita Faturada
+
+O layout Receita Faturada separa o cativo em três opções de compra: CATIVO, SCEE – GD1 e
+SCEE – GD2. O P × Q não faz essa separação. Todo o movimento dos clientes de geração distribuída
+(GD) fica em CATIVO, e as linhas SCEE ficam vazias.
+
+**Por que o BW não permite separar**
+
+- A extração não tem campo que identifique a instalação no SCEE (Sistema de Compensação de
+  Energia Elétrica) nem a modalidade, GD I ou GD II. Os clientes GD aparecem como "Cliente Cativo",
+  junto com os demais.
+- Os códigos de energia compensada (`ZQC223`, `ZQC224`, `ZQC234` e `ZQC235`) não resolvem:
+  - cobrem quase só o grupo A na modalidade Verde e a Tarifa Branca. No grupo B convencional, onde
+    está a maior parte da GD, a compensação já vem abatida do kWh faturado, sem linha própria;
+  - registram o crédito da compensação entre postos (valores negativos), e não o consumo faturado
+    do cliente GD;
+  - não distinguem GD I de GD II.
+
+  Em junho/2026 esses códigos somam −R$ 0,5 milhão. Pelo Mercado Receita, só a classe Comercial
+  teria cerca de R$ 18 milhões em GD1 e GD2 no mesmo mês.
+
+**Alternativas avaliadas e descartadas**
+
+As duas usam o Mercado Receita (MR) do Sparta, que separa GD I, GD II e GD II – SCEE no campo
+`TipoMercado`.
+
+| Alternativa | Como funciona | Por que foi descartada |
+|---|---|---|
+| Proporção do MR | A linha CATIVO / classe / energia do layout é dividida pela participação de GD1 e GD2 no MWh do cativo no MR, no mesmo mês e classe | Atribui ao GD a tarifa média do cativo. O GD II – SCEE tem R$/MWh cerca de 40% menor e não tem ICMS nem PIS/COFINS no MR |
+| Valores do MR com abatimento | As linhas SCEE recebem os valores do MR, coluna a coluna, e a linha CATIVO fica com o BW menos o MR | O MR é simulado (tarifas arredondadas, sem tarifa proporcional, meses aparentemente repetidos) e não separa energia de demanda nos componentes. Todo o erro do MR iria para o saldo do CATIVO |
+
+As duas dão resultados bem diferentes entre si. Em junho/2026, na classe Comercial, a proporção
+levaria R$ 9,7 milhões para GD1 e R$ 8,5 milhões para GD2; os valores do MR, R$ 9,1 milhões e
+R$ 6,4 milhões.
+
+**Por que a aproximação não foi feita**
+
+- **A entrega é receita faturada.** Todo valor do layout vem de um lançamento do BW. Qualquer das
+  duas alternativas colocaria uma estimativa nas linhas SCEE e alteraria a linha CATIVO, que hoje
+  é dado real.
+- **O erro seria grande e não mensurável.** No GD2 Comercial de junho, as duas alternativas
+  divergem em um terço (R$ 8,5 contra R$ 6,4 milhões), e não há referência faturada para saber qual está mais perto da
+  realidade.
+- **O total não ganha nada.** O total do cativo de cada classe é o mesmo com ou sem a separação. A
+  aproximação só redistribuiria valores dentro dele, com um critério sem base no faturamento.
+- **Manter em CATIVO é o tratamento conservador.** O valor está correto no agregado, e a ausência
+  das linhas SCEE fica explícita, em vez de ser preenchida com um número que parece faturado e não
+  é.
+
+**O que resolve**
+
+Um campo na extração do BW que identifique a instalação no SCEE e a modalidade (GD I ou GD II),
+ou o encontro de contas da SCEE separado do faturamento bruto. Com ele, cada lançamento do BW é
+classificado na origem, e o conversor passa a gravar as linhas SCEE com o valor faturado. O pedido
+está registrado em [`sessions.md`](sessions.md), item I4.
+

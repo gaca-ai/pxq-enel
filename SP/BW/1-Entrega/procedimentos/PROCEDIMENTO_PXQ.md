@@ -481,6 +481,8 @@ O script `2-Apoio/gera_receita_faturada.py` lê o pxq do mês e grava
 - **Consumo.** MWh nas linhas de energia e MW nas de demanda.
 - **Opção de compra.** Cativo; livre (o híbrido entra como livre); geração, suprimento e uso da
   distribuição para o SD. Todo o movimento é `FAT`, porque a extração não distingue refaturamento.
+  SCEE – GD1 e SCEE – GD2 não são preenchidos: o BW não identifica a instalação no SCEE, e o
+  movimento desses clientes fica em cativo (README 6.1).
 - **Classe.** A classe do layout correspondente à do BW. Residencial Baixa Renda reúne Baixa Renda,
   BPC, Indígena, Quilombola e Desconto Social.
 - **Bandeira, PIS/COFINS e ICMS.** Saem da aba `Nao_tarifaveis_linha`, com a classe de cada

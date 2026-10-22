@@ -20,7 +20,8 @@ Regras (README, secao 5.1):
 - ZQC237 (Encargo da conta COVID) entra em CDE CONTAS, unidade E.
 - Reativos, ultrapassagem, substituicao tributaria, energia compensada e demais nao
   tarifaveis ficam fora do layout e aparecem na aba Conferencia.
-- SCEE GD1/GD2 ficam zerados: a separacao ainda nao tem origem definida (pendencia).
+- SCEE GD1/GD2 ficam vazios: o BW nao identifica a instalacao no SCEE; o movimento
+  desses clientes fica em CATIVO (README 6.1).
 - Valores em R$ mil; so as linhas com valor sao gravadas.
 """
 import os
@@ -227,7 +228,7 @@ def converte(ref, wb, cab, de_para, grade):
     ws_c.append([])
     for nota in notas:
         ws_c.append([nota])
-    ws_c.append(["Pendência: SCEE - GD1 / SCEE - GD2 não são separados (origem ainda não definida); "
+    ws_c.append(["Pendência: SCEE - GD1 / SCEE - GD2 não são separados (o BW não identifica a instalação no SCEE; README 6.1); "
                  "o movimento desses clientes está em CATIVO."])
     for row in ws_c.iter_rows():
         for cel in row:
