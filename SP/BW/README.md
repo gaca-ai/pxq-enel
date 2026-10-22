@@ -21,8 +21,9 @@ proporcional dos meses de reajuste e não fecha com o faturamento contabilizado.
 
 O P × Q (preço × quantidade) parte do caminho inverso. Ele começa pelo que foi efetivamente
 faturado, extraído do SAP BW, e multiplica cada quantidade faturada pela tarifa homologada pela
-ANEEL. O resultado é aberto nos 37 itens da tarifa e ajustado para que o total feche exatamente
-com a receita contabilizada.
+ANEEL. O resultado é aberto nos 37 itens da tarifa. Sobre ele são aplicados os descontos previstos
+na regulação e, por fim, o ajuste de fechamento (2ª passada), para que o total feche exatamente com
+a receita contabilizada.
 
 ## 1. Objetivo
 
@@ -71,7 +72,7 @@ SP/BW/
 
 | Pasta / arquivo | Para que serve |
 |---|---|
-| [`1-Entrega/Abertura_PxQ.ipynb`](1-Entrega/Abertura_PxQ.ipynb) | O processo completo. Lê o BW e a planilha de geradoras, suprimentos e uso da distribuição (SD), valoriza pela tarifa homologada, aplica os ajustes e grava `pxq_<ref>.xlsx`. |
+| [`1-Entrega/Abertura_PxQ.ipynb`](1-Entrega/Abertura_PxQ.ipynb) | O processo completo. Lê o BW e a planilha de geradoras, suprimentos e uso da distribuição (SD), valoriza pela tarifa homologada, aplica os descontos regulatórios e o ajuste de fechamento (2ª passada) e grava `pxq_<ref>.xlsx`. |
 | `1-Entrega/pxq/pxq_<ref>.xlsx` | Resultado mensal. A aba `Componentes` traz a tarifa de aplicação e `Componentes_BE` a base econômica, ambas abertas nos 37 itens. `Familias` agrupa os itens nas sete famílias. `Nao_tarifaveis_linha` traz os lançamentos que não entram no cálculo, um a um. Nos meses de reajuste há também as abas de calibração da tarifa proporcional. |
 | `1-Entrega/receita_faturada/receita_faturada_<ref>.xlsx` | O pxq convertido no layout Receita Faturada, com a aba `Conferencia`, que concilia o total com a receita do BW. |
 | [`1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md`](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md) | Cada transformação do notebook e o motivo dela. |
@@ -84,7 +85,7 @@ SP/BW/
 
 **Rotina mensal:**
 
-1. Ajustar `ABA_BW` e `REFERENCIA` no Passo 0 do notebook e executar.
+1. Definir `ABA_BW` e `REFERENCIA` no Passo 0 do notebook e executar.
 2. Rodar `python 2-Apoio/gera_receita_faturada.py <ref>`.
 3. Uma vez por ano, quando sai o Mercado Receita do reajuste, rodar os checks de `3-Checks/py/`.
 
@@ -249,14 +250,14 @@ O notebook percorre as etapas abaixo. O porquê de cada uma está no
 - **Tarifa proporcional** (3.6). Nos meses de reajuste, o peso da tarifa nova é estimado por
   subgrupo pela receita dos clientes cativos sem benefício. Os meses normais servem de régua.
 
-**Bloco 2: do valor calculado ao faturado**
+**Bloco 2: aplicação dos descontos e ajuste de fechamento**
 
 - **Regime APE** (3.4). A isenção registrada no BW abate os encargos da TUSD de energia dos livres
   do grupo A.
 - **1ª passada: fonte incentivada** (3.3). A diferença restante dos livres do grupo A é absorvida
   por Fio A + Fio B, com desconto limitado a 100%.
-- **2ª passada: fechamento.** O que ainda sobra é distribuído proporcionalmente entre todos os
-  itens do grupo, até o total igualar a receita. É o indicador de qualidade do processo: quanto
+- **2ª passada: ajuste de fechamento.** É o único ajuste do processo. O que ainda sobra é
+  distribuído proporcionalmente entre todos os itens do grupo, até o total igualar a receita. É o indicador de qualidade do processo: quanto
   menor, mais a tarifa explica sozinha o faturamento.
 
 **Geradoras, suprimentos e uso da distribuição (SD)**
@@ -302,9 +303,9 @@ que explica o restante? A resposta é uma conta de chegada, que fecha exatamente
   energia incentivada, aplicado só sobre Fio A e Fio B (3.3).
 - **(f) 2ª passada, líquida.** O que sobra depois dos descontos regulatórios, distribuído por igual
   entre os itens de cada grupo para fechar na receita: arredondamentos, refaturamentos e acertos de
-  faturamento. Não é desconto; é o fechamento contábil e o principal indicador de qualidade do
+  faturamento. Não é desconto; é o único ajuste do processo e o principal indicador de qualidade do
   processo.
-- **(g) Resíduo não ajustável.** Receita de grupos cujo bloco 1 é zero: sem item tarifário para
+- **(g) Resíduo sem item tarifário.** Receita de grupos cujo bloco 1 é zero: sem item tarifário para
   escalar, ela fica fora da abertura e é informada à parte.
 - **(h) 2ª passada, bruta.** Soma dos valores absolutos da 2ª passada de todos os grupos. Mostra se
   o resultado líquido pequeno esconde ajustes grandes de sinais opostos.
@@ -319,7 +320,7 @@ que explica o restante? A resposta é uma conta de chegada, que fecha exatamente
 | (d) Isenção APE | R$ milhões | −9,9 | −16,1 | −14,7 | −9,2 | −11,0 | −13,0 | −13,1 | −16,1 |
 | (e) Fonte incentivada (1ª passada) | R$ milhões | −63,0 | −63,2 | −64,1 | −66,3 | −63,0 | −62,9 | −68,4 | −72,9 |
 | (f) 2ª passada, líquida | R$ milhões | 0,3 | 0,6 | 1,5 | 1,6 | −0,8 | 1,3 | −5,1 | −0,4 |
-| (g) Resíduo não ajustável | R$ milhões | 0,0 | 0,0 | 0,1 | 0,1 | 0,0 | 0,0 | 0,1 | 0,0 |
+| (g) Resíduo sem item tarifário | R$ milhões | 0,0 | 0,0 | 0,1 | 0,1 | 0,0 | 0,0 | 0,1 | 0,0 |
 | (h) 2ª passada, bruta | R$ milhões | 3,6 | 3,7 | 3,0 | 3,5 | 4,5 | 2,8 | 9,0 | 8,9 |
 
 **Em relação à receita faturada**
@@ -330,7 +331,7 @@ que explica o restante? A resposta é uma conta de chegada, que fecha exatamente
 | (d) Isenção APE | % de (a) | −0,51 | −0,88 | −0,82 | −0,47 | −0,60 | −0,76 | −0,72 | −0,83 |
 | (e) Fonte incentivada (1ª passada) | % de (a) | −3,25 | −3,44 | −3,56 | −3,41 | −3,41 | −3,69 | −3,77 | −3,76 |
 | (f) 2ª passada, líquida | % de (a) | +0,02 | +0,03 | +0,08 | +0,08 | −0,04 | +0,07 | −0,28 | −0,02 |
-| (g) Resíduo não ajustável | % de (a) | 0,00 | 0,00 | 0,00 | 0,01 | 0,00 | 0,00 | 0,00 | 0,00 |
+| (g) Resíduo sem item tarifário | % de (a) | 0,00 | 0,00 | 0,00 | 0,01 | 0,00 | 0,00 | 0,00 | 0,00 |
 | (h) 2ª passada, bruta | % de (a) | 0,19 | 0,20 | 0,17 | 0,18 | 0,25 | 0,16 | 0,50 | 0,46 |
 
 **Leitura**

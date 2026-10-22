@@ -21,10 +21,10 @@ O processo tem duas etapas, que geram dois blocos de valores lado a lado na saí
 | Bloco | O que é | Para que serve |
 |---|---|---|
 | **Bloco 1, calculado** | quantidade × tarifa homologada cheia | É a régua: mostra o que a tarifa explica sozinha |
-| **Bloco 2, ajustado** | o bloco 1 corrigido até fechar na receita faturada | É o produto final: a receita aberta por item |
+| **Bloco 2, com descontos** | o bloco 1 após a aplicação dos descontos regulatórios e do ajuste de fechamento (2ª passada) | É o produto final: a receita aberta por item |
 
 O bloco 1 nunca fecha com a receita, porque a tabela de tarifas traz a tarifa cheia e muitos
-clientes pagam com desconto. A essência do método está em **como** o bloco 2 corrige essa
+clientes pagam com desconto. A essência do método está em **como** o bloco 2 trata essa
 diferença. Cada desconto é devolvido aos itens sobre os quais a regulação o faz incidir. Ele não é
 rateado por igual sobre a tarifa inteira. É isso que mantém, por exemplo, os encargos intactos
 quando o desconto é sobre a rede.
@@ -167,7 +167,7 @@ camada e chave, com as datas de início e fim de cada vigência.
 
 - **Como a tabela é gerada.** O script `2-Apoio/extrai_pcat.py` lê os PCATs publicados pela ANEEL.
   As colunas são localizadas pelo nome, nunca pela posição, então um item novo publicado num ano
-  futuro entra sem ajuste de código.
+  futuro entra sem alteração de código.
 - **Camadas.** A camada financeira é calculada como TA − BE − CVA. O script confere que a identidade
   fecha em todas as vigências.
 - **Incluir uma vigência nova.** Uma vez por ano, quando a ANEEL publica o PCAT do reajuste:
@@ -330,10 +330,11 @@ O valor de `A` em cada benefício:
 É o mesmo tratamento que o Mercado Receita dá à Tarifa Social: energia isenta abatida, não tarifa
 reduzida. A participação estimada aparece na coluna `% energia na faixa 01`.
 
-## Passo 9 — O ajuste: o bloco 2
+## Passo 9 — O bloco 2: aplicação dos descontos e ajuste de fechamento
 
-A diferença entre o bloco 1 e a receita é corrigida em três etapas, nesta ordem. Cada etapa trata
-uma causa e atua só sobre os itens que essa causa afeta.
+A diferença entre o bloco 1 e a receita é tratada em três etapas, nesta ordem. As duas primeiras
+aplicam os descontos previstos na regulação, cada um só sobre os itens em que a regulação o faz
+incidir. A terceira, a 2ª passada, é o único ajuste do processo.
 
 **1. Regime APE** (README 3.4). Linhas do grupo A no mercado livre.
 
@@ -354,12 +355,12 @@ uma causa e atua só sobre os itens que essa causa afeta.
 - Encargos e perdas ficam intactos. Esse é o ponto central do método: um rateio uniforme cortaria
   também a CDE e o PROINFA, que não têm desconto.
 
-**3. 2ª passada: fechamento.** Todos os grupos.
+**3. 2ª passada: ajuste de fechamento.** Todos os grupos.
 
 - O que sobra é distribuído proporcionalmente entre todos os itens do grupo, para cima ou para
   baixo, até o total igualar a receita. A sobra vem de arredondamentos, refaturamentos, acertos
   pontuais e do limite de 100% da 1ª passada.
-- No cativo, que não passa pelas etapas anteriores, a 2ª passada é o único ajuste. Ela é pequena
+- No cativo, que não tem descontos a aplicar nas etapas anteriores, só a 2ª passada atua. Ela é pequena
   porque os benefícios sociais já foram tratados no bloco 1.
 - A 2ª passada **não é um desconto**, e por isso o tamanho dela é o indicador de qualidade do
   processo. A saída mostra, por grupo, quanto veio da 1ª passada e quanto da 2ª.
@@ -367,10 +368,10 @@ uma causa e atua só sobre os itens que essa causa afeta.
   `Diferencas_linha` e `Diferencas_grupo`, para investigação.
 
 **Grupos sem cálculo.** Um grupo com receita e bloco 1 igual a zero não tem item para escalar. A
-receita dele fica fora do bloco 2 e é informada como resíduo não ajustável, nunca escondida.
+receita dele fica fora do bloco 2 e é informada como resíduo sem item tarifário, nunca escondida.
 
 Como todas as operações são multiplicações aplicadas igualmente às quatro camadas, TA = BE + CVA +
-FIN continua exata depois do ajuste.
+FIN continua exata no bloco 2.
 
 ## Passo 10 — Conferências
 
@@ -380,9 +381,9 @@ da célula.
 | Conferência | O que garante |
 |---|---|
 | Bloco 2 = receita, grupo a grupo (com a 2ª passada ligada) | A abertura fecha no faturado |
-| Resíduo não ajustável | Mostra quanto ficou fora do bloco 2 |
+| Resíduo sem item tarifário | Mostra quanto ficou fora do bloco 2 |
 | Abatimento APE ≤ desconto registrado | A isenção não cria desconto inexistente |
-| BE + CVA + FIN = TA | A identidade tarifária sobreviveu aos ajustes |
+| BE + CVA + FIN = TA | A identidade tarifária se mantém no bloco 2 |
 | Famílias = soma dos itens | Nenhum item ficou sem família |
 | Tarifável + não tarifável = total do BW | Nada se perdeu na separação |
 
@@ -438,7 +439,7 @@ lidas e reportadas, para que a conferência contra a aba consolidada as desconte
 
 ## Passo 14 — Juntar BW e SD e conferir
 
-O SD não precisa de ajuste: a tarifa aplicada já está na planilha, então o calculado é a própria
+O SD não passa pelo bloco 2: a tarifa aplicada já está na planilha, então o calculado é a própria
 receita. As linhas entram com regime `direto` e diferença zero, identificadas na coluna `Source`.
 As conferências do SD comparam a receita aberta com a aba consolidada da planilha, cliente a
 cliente e no mesmo mês de referência.
@@ -490,7 +491,7 @@ O script `2-Apoio/gera_receita_faturada.py` lê o pxq do mês e grava
 - **Conta COVID.** Entra em CDE Contas.
 - **Aba `Conferencia`.** Concilia: receita total do pxq = valor gravado no layout + o que ficou fora
   (substituição tributária, reativos, ultrapassagem, energia compensada, acertos da CCEE, resíduo
-  não ajustável). A diferença tem de ser zero.
+  sem item tarifário). A diferença tem de ser zero.
 
 ## Conferência anual contra o Mercado Receita
 
