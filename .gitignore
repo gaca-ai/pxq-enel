@@ -1,0 +1,22 @@
+# Dados da Enel e saídas do processo: não versionar
+**/src/
+aux_files/
+SAMP/data/
+SAMP/9-Historico/
+SP/BW/tbl/calibracao/
+SP/BW/1-Entrega/pxq/
+SP/BW/1-Entrega/receita_faturada/
+SP/BW/3-Checks/resultados/
+SP/RNF/1-Entrega/rnf/
+SAMP/1-Entrega/pxq/
+*.xlsx
+*.xlsb
+*.xls
+*.parquet
+*.pdf
+*.zip
+~$*
+
+# Python / Jupyter
+__pycache__/
+.ipynb_checkpoints/
