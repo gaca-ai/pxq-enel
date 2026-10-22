@@ -62,6 +62,7 @@ SP/BW/
 ├── 3-Checks/
 │   ├── py/                       scripts de conferência contra o Mercado Receita
 │   ├── resultados/               um arquivo de conferência por mês
+│   ├── receita_faturada_MR/      layout Receita Faturada do MR e check PxQ − MR, por mês
 │   └── consolidado_*.xlsx        consolidados mês a mês
 ├── tbl/
 │   ├── tarifas/tarifa_long.csv   tarifas homologadas, todas as vigências e camadas
@@ -78,7 +79,8 @@ SP/BW/
 | [`1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md`](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md) | Cada transformação do notebook e o motivo dela. |
 | [`2-Apoio/extrai_pcat.py`](2-Apoio/extrai_pcat.py) | Lê os PCATs (planilhas de cálculo tarifário da ANEEL) e grava `tbl/tarifas/tarifa_long.csv`. Roda uma vez a cada nova vigência tarifária. |
 | [`2-Apoio/gera_receita_faturada.py`](2-Apoio/gera_receita_faturada.py) | Converte o pxq no layout Receita Faturada: `python gera_receita_faturada.py 2026-06` ou `--todos`. |
-| [`3-Checks/py/`](3-Checks/py/) | `check_mr_bloco2.py` compara o mês por opção de compra e subgrupo. `check_mr_camadas.py` compara por família e camada, mês a mês. `consolida_check_mr_bloco2.py` consolida vários meses. `le_mr.py` lê o Mercado Receita. |
+| [`3-Checks/py/`](3-Checks/py/) | `check_mr_bloco2.py` compara o mês por opção de compra e subgrupo. `check_mr_camadas.py` compara por família e camada, mês a mês. `consolida_check_mr_bloco2.py` consolida vários meses. `le_mr.py` lê o Mercado Receita. `gera_receita_faturada_mr.py` monta o Mercado Receita no layout Receita Faturada e gera o check célula a célula: `python gera_receita_faturada_mr.py 2026-05` ou `--todos`. |
+| `3-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês (seção 5.4). |
 | `3-Checks/resultados/` | Conferências mensais contra o Mercado Receita e a conferência contra o informe de gestão. |
 | `tbl/` | Tabelas geradas pelo próprio processo: tarifas homologadas e o histórico de calibração da tarifa proporcional. |
 | `src/` | Fontes externas: a extração de receita do BW, a planilha do SD, os PCATs (`src/pcats/`) e o Mercado Receita do período tarifário. |
@@ -87,7 +89,8 @@ SP/BW/
 
 1. Definir `ABA_BW` e `REFERENCIA` no Passo 0 do notebook e executar.
 2. Rodar `python 2-Apoio/gera_receita_faturada.py <ref>`.
-3. Uma vez por ano, quando sai o Mercado Receita do reajuste, rodar os checks de `3-Checks/py/`.
+3. Uma vez por ano, quando sai o Mercado Receita do reajuste, rodar os checks de `3-Checks/py/`,
+   inclusive o `gera_receita_faturada_mr.py`, depois do passo 2.
 
 ## 3. Embasamento regulatório
 
@@ -429,6 +432,54 @@ Leitura:
 
 Detalhe completo em `3-Checks/consolidado_check_mr_camadas_2026-01_a_2026-05.xlsx` e, por opção
 de compra e subgrupo, em `3-Checks/consolidado_check_mr_bloco2_2026-01_a_2026-05.xlsx`.
+
+### 5.4 Layout Receita Faturada contra o Mercado Receita
+
+O script `3-Checks/py/gera_receita_faturada_mr.py` monta o Mercado Receita (MR) no mesmo layout da
+Receita Faturada e grava, por mês, as duas versões lado a lado e uma aba `check` com a diferença
+PxQ − MR em cada célula, por fórmula. As linhas são as opções de compra × unidade (D/E), com as
+classes somadas, porque o cadastro de classe do livre difere entre as bases (ver abaixo). A
+abertura por classe é opcional (`--classes`). O consolidado
+(`consolidado_receita_faturada_MR_<ini>_a_<fim>.xlsx`) resume o período com uma linha por mês e marca
+os meses em que o MR é projetado. As premissas da montagem do lado MR estão no
+[procedimento](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md), seção "Check do layout Receita
+Faturada contra o Mercado Receita".
+
+Total do layout, colunas I a AE (R$ milhões):
+
+| | jan | fev | mar | abr | mai | jun | jul | ago |
+|---|---|---|---|---|---|---|---|---|
+| PxQ | 2.515,8 | 2.366,1 | 2.297,3 | 2.483,2 | 2.414,4 | 2.213,7 | 2.362,5 | 2.529,1 |
+| MR | 2.475,3 | 2.359,6 | 2.286,7 | 2.467,3 | 2.377,6 | 2.377,6 | 2.473,9 | 2.525,5 |
+| PxQ − MR | 40,5 | 6,5 | 10,6 | 15,9 | 36,8 | −163,9 | −111,4 | 3,6 |
+
+Leitura:
+
+- **Total.** O MR não tem bandeira, UD/ER e boa parte de Outros; essas colunas aparecem inteiras
+  como diferença, o que explica a maior parte de janeiro e maio. Os MR de junho e julho são
+  projetados (junho repete maio) e não servem de conferência.
+- **Cativo.** Bate; a diferença de 1% a 2% é a bandeira do PxQ. Na abertura por classe, a
+  Residencial Baixa Renda fecha em maio (R$ 72,2 milhões no PxQ, R$ 72,1 milhões no MR, sem
+  tributos).
+- **As classes do livre são diferentes no MR e no BW.** O volume total do livre é praticamente o
+  mesmo nas duas bases, mas a divisão por classe não:
+
+  | Livre, maio/2026 | PxQ (BW) | MR |
+  |---|---|---|
+  | Energia, Industrial (MWh) | 543.906 | 1.316.559 |
+  | Energia, Comercial (MWh) | 716.438 | 25.043 |
+  | Energia, Serviços Públicos (MWh) | 155.893 | 83.578 |
+  | Energia, demais classes (MWh) | 8.611 | 0 |
+  | **Energia, total (MWh)** | **1.424.848** | **1.425.180** |
+  | Valor sem tributos, Industrial (R$ milhões) | 88,9 | 219,9 |
+  | Valor sem tributos, Comercial (R$ milhões) | 133,0 | 4,2 |
+
+  O MR coloca quase todo o livre em Industrial; o BW tem a maior parte em Comercial. É diferença de
+  cadastro da classe do cliente entre as bases, e não de tarifa. Por isso o check, por padrão, não
+  abre por classe. Pendência registrada em [`sessions.md`](sessions.md), P21.
+- **Consumo Próprio.** Mesma energia nas duas bases (7.237 MWh em maio), mas o MR vale o dobro
+  (R$ 5,2 milhões contra R$ 2,6 milhões). Pendência P22.
+- **Geração.** R$ 0,4 milhão no MR contra R$ 3,3 milhões no PxQ em maio.
 
 ## 6. Pendências
 

@@ -122,10 +122,10 @@ BW e para que o conversor possa aproveitar o que interessa ao layout final.
 | ICMS, PIS/COFINS (operação principal `R/#`) | Tributo, não tarifa | Colunas de tributos da Receita Faturada |
 | Bandeiras (códigos `ZQDFAM`, `ZQDPAM`, `ZQDFVM`, `ZQDPVM`, `ZQODAM`, `ZQODVM`, `ZQDIAM`, `ZQDIVM`) | Adicional definido mês a mês, fora da tarifa homologada | Coluna Bandeira da Receita Faturada |
 | Encargo da conta COVID (`ZQC237`) | Lançado sem quantidade | Grupo CDE Contas da Receita Faturada |
-| Reativos; ultrapassagem de demanda: cativo (`ZQD021`, `ZQD022`, `ZQD023`) e livre (`ZQD019`, `ZQD020`, `ZQD037`) | Multa sobre a demanda acima da contratada, sem item na tabela homologada | Fora do layout |
-| Substituição tributária dos livres | Débito e crédito se anulam no mês | Fora do layout |
+| Reativos; ultrapassagem de demanda: cativo (`ZQD021`, `ZQD022`, `ZQD023`) e livre (`ZQD019`, `ZQD020`, `ZQD037`) | Multa sobre a demanda acima da contratada, sem item na tabela homologada | Coluna UD/ER da Receita Faturada |
+| Substituição tributária dos livres | Débito e crédito se anulam no mês | Coluna Outros da Receita Faturada (efeito zero) |
 | "TUSD - Desconto Consumo" e "Complemento Res. 166/05" | Isenção do APE, sem quantidade | Usados no Passo 9 |
-| Acertos homologados pela CCEE, energia compensada fora ponta e intermediário, desconto comercial | Sem tarifa por item | Fora do layout |
+| Acertos homologados pela CCEE, energia compensada fora ponta e intermediário, desconto comercial | Sem tarifa por item | Coluna Outros da Receita Faturada |
 
 Os tributos e as bandeiras são identificados pela regra da área de faturamento: operação principal
 `R/#` para os tributos e os oito códigos acima para as bandeiras. Dentro dos tributos, o campo de
@@ -485,15 +485,31 @@ O script `2-Apoio/gera_receita_faturada.py` lê o pxq do mês e grava
   movimento desses clientes fica em cativo (README 6.1).
 - **Classe.** A classe do layout correspondente à do BW. Residencial Baixa Renda reúne Baixa Renda,
   BPC, Indígena, Quilombola e Desconto Social.
+  - Lançamentos com classe principal "Não atribuído" são classificados pela categoria tarifária.
+    Categoria residencial vai para Residencial, ou para Residencial Baixa Renda quando todas as
+    subclasses listadas no lançamento são de baixa renda ou desconto social.
 - **Bandeira, PIS/COFINS e ICMS.** Saem da aba `Nao_tarifaveis_linha`, com a classe de cada
   lançamento.
   - A parcela TE vai para a linha de energia.
   - A parcela TUSD e os tributos sem parcela, inclusive subvenções, são repartidos entre demanda e
     energia na proporção da receita do bloco 2 da mesma opção e classe.
 - **Conta COVID.** Entra em CDE Contas.
-- **Aba `Conferencia`.** Concilia: receita total do pxq = valor gravado no layout + o que ficou fora
-  (substituição tributária, reativos, ultrapassagem, energia compensada, acertos da CCEE, resíduo
-  sem item tarifário). A diferença tem de ser zero.
+- **UD/ER e Outros.** Duas colunas que não existem no modelo da área, inseridas antes de PIS/COFINS:
+  - **UD/ER:** ultrapassagem de demanda e energia reativa (ultrapassagem, UFER, UFDR, demanda e
+    energia reativa excedente);
+  - **Outros:** os demais lançamentos sem tarifa (acertos da CCEE, energia compensada, atualização
+    de montante, ERCAP, desconto ex-funcionário, encargo de conexão, substituição tributária) e o
+    resíduo sem item tarifário do bloco 2. Na substituição tributária, débito e crédito se anulam
+    dentro de cada classe;
+  - a unidade segue o próprio lançamento: demanda, potência, kW, UFDR e conexão vão para a linha D;
+    o restante, para a linha E.
+- **Geração na linha de energia.** O modelo só tem a linha D para geração. O valor da energia vai
+  para Outros da linha GERAÇÃO / D, e o MWh, que não pode ser somado ao MW, aparece em nota na aba
+  `Conferencia`.
+- **Aba `Conferencia`.** Concilia: receita total do pxq = valor gravado no layout + o que ficou fora.
+  Com as regras acima nada fica fora, e a diferença tem de ser zero. O total gravado é a receita
+  bruta do BW mais o SD, a mesma base da aba 3.2 do informe de gestão. A diferença para o informe
+  vem só do SD (PIS/COFINS das geradoras e receita que falte na planilha do SD).
 
 ## Conferência anual contra o Mercado Receita
 
@@ -509,6 +525,112 @@ Uma vez por ano, quando sai o Mercado Receita do reajuste (README 5.2), os scrip
   TUSD do cativo é igual à TE.
 
 A cobrança direta de ERCAP aos livres fica fora dos dois lados.
+
+## Check do layout Receita Faturada contra o Mercado Receita
+
+O script `3-Checks/py/gera_receita_faturada_mr.py` monta o Mercado Receita (MR) no mesmo layout da
+Receita Faturada e compara as duas versões célula a célula. Roda depois do conversor, porque lê o
+`receita_faturada_<ref>.xlsx` já gerado.
+
+```
+python 3-Checks/py/gera_receita_faturada_mr.py 2026-05            # um mês
+python 3-Checks/py/gera_receita_faturada_mr.py 2026-01 2026-08    # intervalo
+python 3-Checks/py/gera_receita_faturada_mr.py --todos            # todos os receita_faturada
+python 3-Checks/py/gera_receita_faturada_mr.py --todos --classes  # abertura por classe
+```
+
+Por padrão o check é aberto só por opção de compra × unidade (D/E), com as classes somadas na linha
+"Todas as classes". A abertura por classe fica disponível pelo parâmetro `ABRIR_CLASSES` no topo do
+script (padrão `False`) ou pela opção `--classes`.
+
+Saída: `3-Checks/receita_faturada_MR/receita_faturada_MR_<ref>.xlsx`. Quando o script roda para
+mais de um mês, grava também `consolidado_receita_faturada_MR_<ini>_a_<fim>.xlsx`: uma linha por mês
+(soma de todas as linhas do layout), com as mesmas colunas, nas abas `PxQ`, `MR` e `check`
+(fórmulas). A coluna "Obs. MR" marca o mês em que o MR é igual ao do mês anterior, ou seja,
+projetado e sem valor de conferência.
+
+| Aba | Conteúdo |
+|---|---|
+| `PxQ` | O receita_faturada do mês, por opção de compra × unidade (ou, com `--classes`, na grade completa do modelo) |
+| `MR` | O Mercado Receita do mês, no mesmo layout e nas mesmas linhas |
+| `check` | Fórmulas Excel PxQ − MR, célula a célula, com a linha de totais |
+| `Conciliacao` | O que ficou fora do MR (ERC), o subsídio distribuído nos itens e as linhas repartidas entre demanda e energia |
+
+**Premissas**
+
+*Bases*
+
+1. O lado PxQ é o `receita_faturada_<ref>.xlsx` já gerado, sem recálculo.
+2. O lado MR é o `src/SP_mercado_receita.xlsx`, filtrado pelo `AnoMes` do mês.
+3. O script aceita todos os meses do MR. Meses projetados no MR (junho/2026 repete maio) geram um
+   check sem valor de conferência; a aba `Conciliacao` avisa.
+4. Valores em R$ mil. Consumo em MWh na linha E e em MW na linha D (`D` do MR ÷ 1000). No cativo a
+   energia é a `TE_E`; nas demais opções, a `TUSD_E`.
+
+*Grade e classificação*
+
+5. As abas `PxQ` e `MR` têm as mesmas linhas, inclusive as zeradas: por padrão, todas as
+   combinações de opção de compra × unidade do modelo, com as classes somadas; com `--classes`, a
+   grade completa do modelo (opção × classe × unidade). Por isso o check é uma subtração da mesma
+   célula nas duas abas.
+   - O padrão soma as classes porque o cadastro de classe do cliente livre é diferente no MR e no
+     BW (README 5.4).
+6. Opção de compra: LIVRE APE entra como LIVRE e DISTRIBUIÇÃO como USO D. Os clientes GD (Sistema de
+   Compensação) ficam em CATIVO, como no PxQ (README 6.1). O ERC fica fora, porque não passa pelo BW,
+   e o valor aparece na aba `Conciliacao`.
+7. Classe (só com `--classes`): a do próprio MR. A Residencial Baixa Renda é identificada pela subclasse (baixa renda,
+   Tarifa Social ou Desconto Social). Geração, suprimento e uso da distribuição usam a própria opção
+   como classe, como no PxQ.
+
+*Componentes e camadas*
+
+8. Os componentes do MR vão para as colunas do modelo pelo de-para da aba `Instruções`, com o
+   vocabulário do MR: `DISTRIBUICAO` → Parcela B; `EnergiaRevenda` e `ANGRA` → Compra de Energia;
+   perdas técnicas, não técnicas e de rede básica → Perdas; `TUST_RB`, `TUST_FR`, `TUSDG_T`,
+   `TUSDG_ONS`, `TUST_ITAIPU` e `TUST_CI` → Rede Básica; `Itaipu` → Transporte Itaipu; `CUSD` e
+   `Conexao_D` → CUSD; `Conexao_T` → Conexão T; `CDE` → CDE USO; CDE Covid (TUSD e TE) e `CDE GD` →
+   CDE CONTAS; `Cde_Elet` → CDE ELET; `PROINFA`, `ESSERR`, `ONS`, `PeD`, `TFSEE` e `RI` nas colunas de
+   mesmo nome.
+9. `CCC`, `CFURH`, `LIMINAR_1` e `OUTROS` não têm coluna no modelo e vão para Outros.
+10. As colunas `CVA_*` vão para Base CVA e as `FinCT_*` para Base Financeira. Os totais do MR
+    (`CVA_Totaltusd`, `CVA_Totalte`, `FinCT_Geral`) ficam fora, para não contar em dobro.
+
+*Subsídio*
+
+11. O subsídio fica dentro dos itens, pelo abatimento de quantidade do próprio MR: `Daj/D` na
+    demanda, `TUSD_Eaj/TUSD_E` na energia TUSD e `TE_Eaj/TE_E` na TE. É o mesmo tratamento do PxQ,
+    que carrega os descontos dentro dos itens.
+12. O que o abatimento não explica (a diferença de tarifa da Baixa Renda, principalmente) é
+    distribuído proporcionalmente nos itens da própria linha, que passa a somar o `FinTotAj` do MR
+    (receita depois dos subsídios). O valor distribuído aparece na aba `Conciliacao`.
+
+*Demanda e energia*
+
+13. Componentes TE vão para a linha E.
+14. Componentes TUSD vão para a linha D quando a linha do MR só tem demanda, e para a linha E quando
+    só tem energia.
+15. Nas linhas com demanda e energia juntas (cativo Azul do grupo A, cerca de 1% do valor), cada
+    componente BE é repartido pela tarifa homologada BE do próprio componente: demanda × tarifa em
+    kW contra energia × tarifa em MWh, na vigência que contém o dia 15 do mês. CVA e FIN são
+    repartidos pela tarifa BE Total TUSD.
+16. O P&D do MR é uma coluna única para TUSD e TE. Na repartição das linhas mistas, a parte de
+    energia considera as duas tarifas.
+
+*Tributos e itens que o MR não tem*
+
+17. `icms` vai para ICMS; `cofins` + `pispasep` vão para PIS/COFINS. A repartição entre D e E segue a
+    proporção do valor da opção × classe, como no PxQ.
+18. Bandeira e UD/ER ficam zerados no MR, porque ele não tem esses valores. Na comparação do total,
+    essas colunas (e Outros) aparecem inteiras como diferença.
+19. A geração na linha E, que não existe no modelo, vai para Outros da linha GERAÇÃO / D, como no
+    PxQ. O MWh não é gravado.
+
+*Lado PxQ (herdado do receita_faturada)*
+
+20. Todo o movimento entra como FAT; o híbrido entra como LIVRE.
+21. A classe principal "Não atribuído" é classificada pela categoria tarifária.
+22. UD/ER e Outros ficam antes de PIS/COFINS; a receita do pxq (BW + SD) está toda gravada no
+    layout.
 
 ---
 
