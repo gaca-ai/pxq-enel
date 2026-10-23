@@ -14,7 +14,7 @@ their names: CVA_* = CVA, FinCT_*/finCT_*/FINCT_* = FIN, the rest = BE.
 Usage:
     python check_mr_camadas.py 2026-01 2026-05
 Reads  1-Entrega/pxq/pxq_<ref>.xlsx (sheet Familias) and the MR of each month (le_mr.py)
-Writes 3-Checks/consolidado_check_mr_camadas_<ini>_a_<fim>.xlsx
+Writes 2-Checks/consolidado_check_mr_camadas_<ini>_a_<fim>.xlsx
 """
 import os
 import sys
@@ -29,7 +29,7 @@ from le_mr import FAMILIA_MR, PARCELA_TE, carrega_mr  # noqa: E402
 BASE = Path(os.environ.get("PXQ_BASE", r"C:\python_projects\claude\p_x_q\SP\BW"))
 INI, FIM = (sys.argv[1], sys.argv[2]) if len(sys.argv) > 2 else ("2026-01", "2026-05")
 REFS = [p.strftime("%Y-%m") for p in pd.period_range(INI, FIM, freq="M")]
-SAIDA = BASE / "3-Checks" / f"consolidado_check_mr_camadas_{INI}_a_{FIM}.xlsx"
+SAIDA = BASE / "2-Checks" / f"consolidado_check_mr_camadas_{INI}_a_{FIM}.xlsx"
 
 FAMILIAS = ["FIO A", "FIO B", "ENCARGOS", "PERDAS", "ENERGIA", "RI", "OUTROS"]
 LINHAS = [f"BE · {f}" for f in FAMILIAS] + ["CVA (total)", "FIN (total)", "TOTAL"]

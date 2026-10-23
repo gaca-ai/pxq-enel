@@ -29,7 +29,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 ROOT = Path(os.environ.get("PXQ_ROOT", r"C:\python_projects\claude\p_x_q"))
-sys.path.insert(0, str(ROOT / "SP" / "BW" / "3-Checks" / "py"))
+sys.path.insert(0, str(ROOT / "SP" / "BW" / "3-Py" / "2-Checks"))
 from le_mr import carrega_mr as _carrega_mr  # noqa: E402
 CNPJ_SP = "61695227000193"
 NSA = "Não se aplica"
@@ -167,7 +167,7 @@ def familias_mr(ref, incluir_erc=True):
     """MR rows with OPCAO, SUBGRUPO, the comparison measures and the families
     (subsidy spread by the MR quantity abatement, as in check_mr_bloco2.py)."""
     # same MR loader as the BW checks: single-month file or tariff-period file,
-    # PROJETADO months refused (SP/BW/3-Checks/py/le_mr.py)
+    # PROJETADO months refused (SP/BW/3-Py/2-Checks/le_mr.py)
     mr, _ = _carrega_mr(ROOT / "SP" / "BW", ref)
     mr = mr[mr["Subgrupo"].notna()].copy()
     if not incluir_erc:

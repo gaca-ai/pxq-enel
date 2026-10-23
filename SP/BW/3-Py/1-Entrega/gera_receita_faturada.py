@@ -1,6 +1,6 @@
 """
 Converte a saida do PxQ (1-Entrega/pxq/pxq_<ref>.xlsx) no modelo Receita Faturada
-solicitado pela area (aux_files/De-Para_Modelo_PyC.xlsx, aba "Receita Faturada").
+solicitado pela area (tbl/modelo/De-Para_Modelo_PyC.xlsx, abas "Receita Faturada" e "Instrucoes").
 
 Uso:
     python gera_receita_faturada.py 2026-06            # um mes
@@ -34,6 +34,8 @@ Regras (README, secao 5.1):
   desconto social.
 - Linha E sem correspondente no modelo (GERACAO): o valor vai para Outros da linha D da mesma
   opcao; o MWh nao e gravado e aparece em nota na aba Conferencia.
+- PIS/COFINS e ultrapassagem do SD (geradoras, suprimentos e uso da distribuicao) vem do pxq como
+  nao tarifaveis e vao para PIS/COFINS e UD/ER da linha da propria opcao.
 - Valores em R$ mil; so as linhas com valor sao gravadas.
 """
 import os
@@ -48,7 +50,7 @@ import pandas as pd
 import openpyxl
 
 BASE = Path(os.environ.get("PXQ_BASE", r"C:\python_projects\claude\p_x_q\SP\BW"))
-ARQ_MODELO = BASE.parents[1] / "aux_files" / "De-Para_Modelo_PyC.xlsx"
+ARQ_MODELO = BASE / "tbl" / "modelo" / "De-Para_Modelo_PyC.xlsx"     # layout model of the area (versioned)
 DIR_PXQ = BASE / "1-Entrega" / "pxq"
 DIR_SAIDA = BASE / "1-Entrega" / "receita_faturada"
 
@@ -61,6 +63,7 @@ OPCAO = {"Cliente Cativo": "CATIVO", "Cliente Livre": "LIVRE", "Cliente Híbrido
 CLASSE = {"Residencial": "Residencial", "Industrial": "Industrial", "Comercial, Serviços": "Comercial",
           "Rural": "Rural", "Poder Público": "Poderes Públicos", "Iluminação Pública": "Iluminação Pública",
           "Serviço Público": "Serviços Públicos", "Consumo Próprio": "Consumo Próprio"}
+OPCOES_SD = {"GERAÇÃO", "SUPRIMENTO", "USO D"}                     # SD options: class = option
 COL_ID = ["Responsável", "Competência", "TipoFaturamento", "OpcaoCompra", "Classe", "Unidade"]
 COL_UDER, COL_OUTROS = "UD/ER", "Outros"                          # new columns, before PIS/COFINS
 PADRAO_UDER = "ULTRAPA|UFER|UFDR|REATIV"
@@ -107,11 +110,17 @@ def classe_modelo(classe_principal, subclasse, categoria=None):
     return CLASSE.get(classe_principal)
 
 
-def converte(ref, wb, cab, de_para, grade):
+def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None):
+    """Layout of month `ref` from the pxq, using the component columns of `bloco` ("[2]" = the
+    delivery). `prepara(comp, be)` may add in-memory blocks; with grava=False nothing is written and
+    the layout table (R$, indexed by option x class x unit) is returned."""
     arq = DIR_PXQ / f"pxq_{ref}.xlsx"
     comp = pd.read_excel(arq, "Componentes")
     be = pd.read_excel(arq, "Componentes_BE")
     nt = pd.read_excel(arq, "Nao_tarifaveis_linha")
+    if prepara is not None:
+        comp, be = prepara(comp, be)
+    pre = f"{bloco} "
     receita_total = comp["RECEITA DE FORNECIMENTO"].sum()
 
     # ------------------------------------------------ tariff groups (BW + SD), BE layer
@@ -124,22 +133,22 @@ def converte(ref, wb, cab, de_para, grade):
                          tar["Categoria tarifa"])]
     tar["UNIDADE"] = np.where(tar["Chave"].astype(str).str.endswith("kW"), "D", "E")
     tar["CONSUMO"] = np.where(tar["UNIDADE"] == "D", tar["TOTAL DEMANDA"], tar["TOTAL CONSUMO"]) / 1000
-    cols_comp = [c for c in be.columns if c.startswith("[2] ") and not c.startswith("[2] Total")]
+    cols_comp = [c for c in be.columns if c.startswith(pre) and not c.startswith(pre + "Total")]
     # SD keys valued by the SD own tariff sheet carry only the TA layer (no BE/CVA/FIN split):
     # their TA components go to the economic columns, and the row is listed in Conferencia
     so_ta = (tar["[2] Total TA"].fillna(0.0) - tar[["[2] Total BE", "[2] Total CVA", "[2] Total FIN"]]
              .fillna(0.0).sum(axis=1)).abs() > 0.01
     tar.loc[so_ta, cols_comp] = tar_ta.loc[so_ta, cols_comp].values
-    tar.loc[so_ta, "[2] Total BE"] = tar.loc[so_ta, "[2] Total TA"]
+    tar.loc[so_ta, pre + "Total BE"] = tar.loc[so_ta, pre + "Total TA"]
     notas = [f"Tarifa própria do SD sem camadas (só TA), alocada na base econômica: "
              f"{r['Chave']} - R$ {r['[2] Total TA']:,.2f}" for _, r in tar[so_ta].iterrows()]
     for c in cols_comp:
-        destino = de_para.get(c[4:])
+        destino = de_para.get(c[len(pre):])
         if destino:
             tar[destino] = tar.get(destino, 0.0) + tar[c].fillna(0.0)
-    sem_coluna = tar[[c for c in cols_comp if c[4:] not in de_para]].fillna(0.0).sum(axis=1)
-    tar[cab["BASE FINANCEIRA"]] = tar["[2] Total FIN"].fillna(0.0)
-    tar[cab["BASE CVA"]] = tar["[2] Total CVA"].fillna(0.0)
+    sem_coluna = tar[[c for c in cols_comp if c[len(pre):] not in de_para]].fillna(0.0).sum(axis=1)
+    tar[cab["BASE FINANCEIRA"]] = tar[pre + "Total FIN"].fillna(0.0)
+    tar[cab["BASE CVA"]] = tar[pre + "Total CVA"].fillna(0.0)
     tar["RESIDUO"] = tar["RECEITA DE FORNECIMENTO"] - tar["[2] Total TA"].fillna(0.0)
     # TUSD and total TA by unit, used to split taxes between D and E
     tusd = [c for c in comp.columns if c.startswith("[2] TUSD")]
@@ -163,8 +172,8 @@ def converte(ref, wb, cab, de_para, grade):
     # ------------------------------------------------ non-tariff lines
     nt = nt.copy()
     nt["OPCAO"] = nt["Flag Cli.Liv./ Cat."].map(OPCAO)
-    nt["CLASSE"] = [classe_modelo(c, s, ct) for c, s, ct in
-                    zip(nt["Classe principal"], nt["Classe/Sub-classe"], nt["Categoria tarifa"])]
+    nt["CLASSE"] = [o if o in OPCOES_SD else classe_modelo(c, s, ct) for o, c, s, ct in
+                    zip(nt["OPCAO"], nt["Classe principal"], nt["Classe/Sub-classe"], nt["Categoria tarifa"])]
     mont = nt["Grp.estatísts.mont."].astype(str)
     quant = nt["Grp.estatísts.quant."].astype(str)
     tributo = nt["Operação principal"].astype(str).str.contains("R/#", regex=False)
@@ -233,6 +242,8 @@ def converte(ref, wb, cab, de_para, grade):
             r = tabela.loc[(op, cl, u)]
             if r.abs().sum() > 0.005:
                 linhas.append(["Faturamento", competencia, "FAT", op, cl, u] + list(r.values))
+    if not grava:
+        return tabela[[k in na_grade for k in tabela.index]], valores
 
     # ------------------------------------------------ write output from the template
     wb = openpyxl.load_workbook(ARQ_MODELO)

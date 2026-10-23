@@ -21,7 +21,7 @@ Normalizations (MR -> SAMP vocabulary):
 
 Usage:
     python check_samp_mr.py 2026-03
-Reads  SAMP/data/samp-<yyyy>.parquet and the MR of the month (SP/BW/3-Checks/py/le_mr.py)
+Reads  SAMP/data/samp-<yyyy>.parquet and the MR of the month (SP/BW/3-Py/2-Checks/le_mr.py)
 Writes SAMP/1-Entrega/checks/resultados/check_samp_mr_<ref>.xlsx
 """
 import os
@@ -31,7 +31,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(os.environ.get("PXQ_ROOT", r"C:\python_projects\claude\p_x_q")) / "SP" / "BW" / "3-Checks" / "py"))
+sys.path.insert(0, str(Path(os.environ.get("PXQ_ROOT", r"C:\python_projects\claude\p_x_q")) / "SP" / "BW" / "3-Py" / "2-Checks"))
 from le_mr import carrega_mr  # noqa: E402
 
 BASE = Path(os.environ.get("PXQ_ROOT", r"C:\python_projects\claude\p_x_q"))

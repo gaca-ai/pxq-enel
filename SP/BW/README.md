@@ -38,7 +38,7 @@ com três características:
   (FIN), que somam a tarifa de aplicação (TA).
 
 A saída final é entregue no layout **Receita Faturada** definido pela área de Planejamento
-(`aux_files/De-Para_Modelo_PyC.xlsx`).
+(`tbl/modelo/De-Para_Modelo_PyC.xlsx`).
 
 O método foi construído para ser replicado. Outras distribuidoras do grupo (CE, RJ) e outras
 fontes de receita, como a Renda Não Faturada (RNF) e a CNR, mudam os arquivos de entrada, não a
@@ -56,40 +56,54 @@ SP/BW/
 │   ├── receita_faturada/         a mesma saída no layout Receita Faturada
 │   └── procedimentos/
 │       └── PROCEDIMENTO_PXQ.md   manual gerencial do notebook
-├── 2-Apoio/
-│   ├── extrai_pcat.py            gera a tabela de tarifas a partir dos PCATs
-│   └── gera_receita_faturada.py  converte o pxq no layout Receita Faturada
-├── 3-Checks/
-│   ├── py/                       scripts de conferência contra o Mercado Receita
+├── 2-Checks/                     saídas das conferências
 │   ├── resultados/               um arquivo de conferência por mês
 │   ├── receita_faturada_MR/      layout Receita Faturada do MR e check PxQ − MR, por mês
+│   ├── receita_faturada_Bl1_vs_Bl2/  tarifa homologada × tarifa realizada e descontos por origem
 │   └── consolidado_*.xlsx        consolidados mês a mês
+├── 3-Py/                         todos os scripts Python, separados pela pasta que alimentam
+│   ├── 1-Entrega/
+│   │   ├── extrai_pcat.py            gera a tabela de tarifas a partir dos PCATs
+│   │   └── gera_receita_faturada.py  converte o pxq no layout Receita Faturada
+│   └── 2-Checks/
+│       ├── le_mr.py                  lê o Mercado Receita do mês
+│       ├── check_mr_bloco2.py        check por opção de compra e subgrupo
+│       ├── check_mr_camadas.py       check por família e camada
+│       ├── consolida_check_mr_bloco2.py  consolida o check por subgrupo
+│       ├── gera_receita_faturada_mr.py   layout Receita Faturada do MR e check célula a célula
+│       └── gera_receita_faturada_bl1_vs_bl2.py  tarifa homologada × tarifa realizada (descontos)
 ├── tbl/
 │   ├── tarifas/tarifa_long.csv   tarifas homologadas, todas as vigências e camadas
+│   ├── modelo/De-Para_Modelo_PyC.xlsx  modelo da área para o layout Receita Faturada
 │   └── calibracao/               histórico mensal usado na tarifa proporcional
-├── src/                          arquivos de origem (não editados pelo processo)
-└── arquivo_morto_2026-10-04.zip  versões anteriores e material de investigação
+└── src/                          arquivos de origem (não editados pelo processo)
 ```
 
 | Pasta / arquivo | Para que serve |
 |---|---|
 | [`1-Entrega/Abertura_PxQ.ipynb`](1-Entrega/Abertura_PxQ.ipynb) | O processo completo. Lê o BW e a planilha de geradoras, suprimentos e uso da distribuição (SD), valoriza pela tarifa homologada, aplica os descontos regulatórios e o ajuste de fechamento (2ª passada) e grava `pxq_<ref>.xlsx`. |
-| `1-Entrega/pxq/pxq_<ref>.xlsx` | Resultado mensal. A aba `Componentes` traz a tarifa de aplicação e `Componentes_BE` a base econômica, ambas abertas nos 37 itens. `Familias` agrupa os itens nas sete famílias. `Nao_tarifaveis_linha` traz os lançamentos que não entram no cálculo, um a um. Nos meses de reajuste há também as abas de calibração da tarifa proporcional. |
+| `1-Entrega/pxq/pxq_<ref>.xlsx` | Resultado mensal. A aba `Leia-me` descreve cada aba e os scripts que a usam. A aba `Componentes` traz a tarifa de aplicação e `Componentes_BE` a base econômica, ambas abertas nos 37 itens. `Familias` agrupa os itens nas sete famílias. `Nao_tarifaveis_linha` traz os lançamentos que não entram no cálculo, um a um. Nos meses de reajuste há também as abas de calibração da tarifa proporcional. |
 | `1-Entrega/receita_faturada/receita_faturada_<ref>.xlsx` | O pxq convertido no layout Receita Faturada, com a aba `Conferencia`, que concilia o total com a receita do BW. |
-| [`1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md`](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md) | Cada transformação do notebook e o motivo dela. |
-| [`2-Apoio/extrai_pcat.py`](2-Apoio/extrai_pcat.py) | Lê os PCATs (planilhas de cálculo tarifário da ANEEL) e grava `tbl/tarifas/tarifa_long.csv`. Roda uma vez a cada nova vigência tarifária. |
-| [`2-Apoio/gera_receita_faturada.py`](2-Apoio/gera_receita_faturada.py) | Converte o pxq no layout Receita Faturada: `python gera_receita_faturada.py 2026-06` ou `--todos`. |
-| [`3-Checks/py/`](3-Checks/py/) | `check_mr_bloco2.py` compara o mês por opção de compra e subgrupo. `check_mr_camadas.py` compara por família e camada, mês a mês. `consolida_check_mr_bloco2.py` consolida vários meses. `le_mr.py` lê o Mercado Receita. `gera_receita_faturada_mr.py` monta o Mercado Receita no layout Receita Faturada e gera o check célula a célula: `python gera_receita_faturada_mr.py 2026-05` ou `--todos`. |
-| `3-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês (seção 5.4). |
-| `3-Checks/resultados/` | Conferências mensais contra o Mercado Receita e a conferência contra o informe de gestão. |
-| `tbl/` | Tabelas geradas pelo próprio processo: tarifas homologadas e o histórico de calibração da tarifa proporcional. |
+| [`1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md`](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md) | Cada transformação do notebook e dos scripts, e o motivo dela. |
+| `2-Checks/resultados/` | Conferências mensais contra o Mercado Receita e a conferência contra o informe de gestão. |
+| `2-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês (seção 5.4). |
+| `2-Checks/receita_faturada_Bl1_vs_Bl2/` | Um arquivo por mês com o layout pela tarifa homologada (bloco 1) e pela tarifa realizada (bloco 2), a diferença por fórmula e a diferença separada em APE, fonte incentivada e 2ª passada, e o consolidado com uma linha por mês (seção 5.5). |
+| `2-Checks/consolidado_*.xlsx` | Checks por família e camada e por opção de compra e subgrupo, consolidados mês a mês (seção 5.3). |
+| [`3-Py/1-Entrega/extrai_pcat.py`](3-Py/1-Entrega/extrai_pcat.py) | Lê os PCATs (planilhas de cálculo tarifário da ANEEL) e grava `tbl/tarifas/tarifa_long.csv`. Roda uma vez a cada nova vigência tarifária. |
+| [`3-Py/1-Entrega/gera_receita_faturada.py`](3-Py/1-Entrega/gera_receita_faturada.py) | Converte o pxq no layout Receita Faturada: `python 3-Py/1-Entrega/gera_receita_faturada.py 2026-06` ou `--todos`. |
+| [`3-Py/2-Checks/`](3-Py/2-Checks/) | `check_mr_bloco2.py` compara o mês por opção de compra e subgrupo. `check_mr_camadas.py` compara por família e camada, mês a mês. `consolida_check_mr_bloco2.py` consolida vários meses. `le_mr.py` lê o Mercado Receita (também usado pelos checks do SAMP). `gera_receita_faturada_mr.py` monta o Mercado Receita no layout Receita Faturada e gera o check célula a célula: `python 3-Py/2-Checks/gera_receita_faturada_mr.py 2026-05` ou `--todos`. `gera_receita_faturada_bl1_vs_bl2.py` compara a tarifa homologada com a realizada e separa os descontos: `python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py --todos`. |
+| `tbl/` | Tabelas do processo: tarifas homologadas, o histórico de calibração da tarifa proporcional e o modelo do layout Receita Faturada. |
+| `tbl/modelo/De-Para_Modelo_PyC.xlsx` | Modelo da área para o layout Receita Faturada: a aba "Receita Faturada" define as colunas e a grade de linhas; a aba "Instruções", o de-para dos itens tarifários para os grupos do layout. Sem ele a Receita Faturada não é gerada. Não tem dados da Enel e é versionado no Git. |
 | `src/` | Fontes externas: a extração de receita do BW, a planilha do SD, os PCATs (`src/pcats/`) e o Mercado Receita do período tarifário. |
+
+Os scripts localizam os arquivos a partir da pasta `SP/BW` (variável `PXQ_BASE`), e não da pasta onde
+estão. Por isso os comandos acima rodam a partir de `SP/BW`.
 
 **Rotina mensal:**
 
 1. Definir `ABA_BW` e `REFERENCIA` no Passo 0 do notebook e executar.
-2. Rodar `python 2-Apoio/gera_receita_faturada.py <ref>`.
-3. Uma vez por ano, quando sai o Mercado Receita do reajuste, rodar os checks de `3-Checks/py/`,
+2. Rodar `python 3-Py/1-Entrega/gera_receita_faturada.py <ref>`.
+3. Uma vez por ano, quando sai o Mercado Receita do reajuste, rodar os checks de `3-Py/2-Checks/`,
    inclusive o `gera_receita_faturada_mr.py`, depois do passo 2.
 
 ## 3. Embasamento regulatório
@@ -430,12 +444,12 @@ Leitura:
   da do MR nesse mês. A investigação está registrada em [`sessions.md`](sessions.md).
 - **RI e OUTROS.** São zero nos dois lados em SP.
 
-Detalhe completo em `3-Checks/consolidado_check_mr_camadas_2026-01_a_2026-05.xlsx` e, por opção
-de compra e subgrupo, em `3-Checks/consolidado_check_mr_bloco2_2026-01_a_2026-05.xlsx`.
+Detalhe completo em `2-Checks/consolidado_check_mr_camadas_2026-01_a_2026-05.xlsx` e, por opção
+de compra e subgrupo, em `2-Checks/consolidado_check_mr_bloco2_2026-01_a_2026-05.xlsx`.
 
 ### 5.4 Layout Receita Faturada contra o Mercado Receita
 
-O script `3-Checks/py/gera_receita_faturada_mr.py` monta o Mercado Receita (MR) no mesmo layout da
+O script `3-Py/2-Checks/gera_receita_faturada_mr.py` monta o Mercado Receita (MR) no mesmo layout da
 Receita Faturada e grava, por mês, as duas versões lado a lado e uma aba `check` com a diferença
 PxQ − MR em cada célula, por fórmula. As linhas são as opções de compra × unidade (D/E), com as
 classes somadas, porque o cadastro de classe do livre difere entre as bases (ver abaixo). A
@@ -480,6 +494,38 @@ Leitura:
 - **Consumo Próprio.** Mesma energia nas duas bases (7.237 MWh em maio), mas o MR vale o dobro
   (R$ 5,2 milhões contra R$ 2,6 milhões). Pendência P22.
 - **Geração.** R$ 0,4 milhão no MR contra R$ 3,3 milhões no PxQ em maio.
+
+### 5.5 Tarifa homologada × tarifa realizada: onde estão os descontos
+
+O script `3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py` monta o layout Receita Faturada pelo
+bloco 1 (tarifa homologada) e pelo bloco 2 (tarifa realizada, a entrega) e separa a diferença em APE,
+fonte incentivada e 2ª passada, item a item. Regras e limites no
+[procedimento](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md), seção "Check tarifa homologada × tarifa
+realizada".
+
+Diferença tarifa homologada − tarifa realizada (R$ milhões; positivo = desconto):
+
+| | jan | fev | mar | abr | mai | jun | jul | ago |
+|---|---|---|---|---|---|---|---|---|
+| APE | 9,9 | 16,1 | 14,7 | 9,2 | 11,0 | 13,0 | 13,1 | 16,1 |
+| Fonte incentivada | 63,0 | 63,2 | 64,1 | 66,3 | 63,0 | 62,9 | 68,4 | 72,9 |
+| 2ª passada | −0,3 | −0,6 | −1,5 | −1,6 | 0,8 | −1,3 | 5,1 | 0,4 |
+| **Total** | **72,6** | **78,8** | **77,2** | **73,9** | **74,9** | **74,6** | **86,6** | **89,4** |
+
+O total é a linha (c) da seção 5.1; APE, fonte incentivada e 2ª passada são as linhas (d), (e) e (f)
+com o sinal invertido.
+
+Leitura:
+
+- **Fonte incentivada.** Cai só nos itens de rede: em maio, Parcela B (Fio B) R$ 37,9 milhões, Rede
+  Básica R$ 24,2 milhões, Conexão T R$ 1,1 milhão e CUSD R$ 0,2 milhão.
+- **APE.** Cai só nos encargos: em maio, CDE USO R$ 8,8 milhões e PROINFA R$ 1,6 milhão.
+- **Fora do check.** Tarifa Social, Desconto Social e as tarifas próprias das subclasses já estão no
+  bloco 1 e não aparecem na diferença.
+- **Consumo Próprio.** A 2ª passada do Consumo Próprio cativo é de R$ 2,6 milhões em maio: a tarifa
+  cheia dá R$ 5,2 milhões e o faturado é R$ 2,6 milhões. A tarifa homologada é o valor do Mercado
+  Receita (seção 5.4), o que indica que o faturamento cobra cerca de metade da tarifa no consumo
+  próprio. Pendência P22.
 
 ## 6. Pendências
 
@@ -542,3 +588,16 @@ ou o encontro de contas da SCEE separado do faturamento bruto. Com ele, cada lan
 classificado na origem, e o conversor passa a gravar as linhas SCEE com o valor faturado. O pedido
 está registrado em [`sessions.md`](sessions.md), item I4.
 
+### 6.2 Nova fonte do SD e abertura estimada da CERIS
+
+A planilha de geradoras, suprimentos e uso da distribuição (SD) será substituída por um arquivo da
+área com receita, tributos, consumo e demanda por agente e mês de competência, a mesma base do
+informe de gestão. Com ele, a diferença que hoje sobra no SD contra o informe (R$ 3,2 milhões em
+janeiro e R$ 0,3 milhão em agosto) desaparece. A adaptação aguarda a separação de demanda e energia
+em ponta e fora ponta, já pedida à área.
+
+A divisão da receita da CERIS entre os itens tarifários será estimada: a energia TE é a sobra da
+receita depois da TUSD, aberta pela composição da TE da CERIS. O total da CERIS fica exato; a
+estimativa não impacta o resultado final, porque a CERIS soma cerca de R$ 9 milhões por ano (0,03%
+da receita). Regras no [procedimento](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md), Passo 14;
+pendência P23 em [`sessions.md`](sessions.md).

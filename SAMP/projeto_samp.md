@@ -110,7 +110,7 @@ subsídio):
 
 Script `SAMP/model/pxq_samp_check_mr.py` (`python pxq_samp_check_mr.py
 2026-03`), saída `SAMP/saida/check_pxq_samp_mr_2026-03.xlsx`. Mesmo layout do
-`SP/BW/3-Checks/py/check_mr_bloco2.py` (README.md seção 6 item 7): uma aba por
+`SP/BW/3-Py/2-Checks/check_mr_bloco2.py` (README.md seção 6 item 7): uma aba por
 medida e por família, linhas opção x subgrupo, colunas PxQ SAMP [2] | MR |
 Delta | Delta % | Participação no delta; aba `Base_PxQ_SAMP` com o detalhe por
 grupo (chave, regime, blocos 1 e 2, famílias).
@@ -162,7 +162,7 @@ Quantidades (energia TUSD, TE, demanda): diferença zero.
 | ENERGIA | +0,66% | +0,7% | - |
 | OUTROS | +3,9% | +0,5% | +28% (-R$ 0,62 mi) |
 
-Comparação com o PxQ pelo BW no mesmo mês (`SP/BW/3-Checks/resultados/check_mr_bloco2_2026-03.xlsx`):
+Comparação com o PxQ pelo BW no mesmo mês (`SP/BW/2-Checks/resultados/check_mr_bloco2_2026-03.xlsx`):
 
 | Livres | PxQ BW | PxQ SAMP |
 |---|---|---|
@@ -333,11 +333,11 @@ SAMP/
   do BW leem o `pxq_<ref>.xlsx`. Validação da migração: mar/26 pelo notebook reproduz o motor antigo
   ao centavo (bloco 1 R$ 1.875.870.291,32; 1ª passada R$ -63.473.604,50; 2ª passada
   R$ 3.683.188,54; bloco 2 R$ 1.816.079.875,36), e os checks de jan a mai reproduzem os deltas.
-- **Mercado Receita do mês:** todos os checks usam `SP/BW/3-Checks/py/le_mr.py` (arquivo mensal
+- **Mercado Receita do mês:** todos os checks usam `SP/BW/3-Py/2-Checks/le_mr.py` (arquivo mensal
   se existir; senão o arquivo do período tarifário filtrado por `AnoMes`; mês PROJETADO recusado).
 - **Rodar um mês:** notebook com `REFERENCIA` no Passo 0; depois, em `checks/py`,
   `python pxq_samp_check_mr.py <ref>`, `python compara_bw_samp_mr.py <ref>` etc. Consolidado:
-  `python SP/BW/3-Checks/py/consolida_check_mr_bloco2.py 2026-01 2026-05 --fonte samp`.
+  `python SP/BW/3-Py/2-Checks/consolida_check_mr_bloco2.py 2026-01 2026-05 --fonte samp`.
 
 | Script (`1-Entrega/checks/py/`) | Conteúdo |
 |---|---|

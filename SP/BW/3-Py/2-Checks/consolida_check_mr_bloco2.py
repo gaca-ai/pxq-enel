@@ -6,8 +6,8 @@ same level month after month or swing and offset each other.
 
 Usage:
     python consolida_check_mr_bloco2.py 2026-01 2026-05
-        reads  3-Checks/resultados/check_mr_bloco2_<ref>.xlsx (every month in the range)
-        writes 3-Checks/consolidado_check_mr_bloco2_<ini>_a_<fim>.xlsx
+        reads  2-Checks/resultados/check_mr_bloco2_<ref>.xlsx (every month in the range)
+        writes 2-Checks/consolidado_check_mr_bloco2_<ini>_a_<fim>.xlsx
     python consolida_check_mr_bloco2.py 2026-01 2026-05 --fonte samp
         same, for the PxQ fed by SAMP (SAMP/1-Entrega/checks/py/pxq_samp_check_mr.py):
         reads  SAMP/1-Entrega/checks/resultados/check_pxq_samp_mr_<ref>.xlsx
@@ -46,8 +46,8 @@ INI, FIM = ARGS.ini, ARGS.fim
 
 # input folder, monthly file prefix, output file and label of the PxQ side per source
 FONTES = {
-    "bw": (BASE / "3-Checks" / "resultados", "check_mr_bloco2",
-           BASE / "3-Checks", "consolidado_check_mr_bloco2", "PxQ bloco 2 (BW)"),
+    "bw": (BASE / "2-Checks" / "resultados", "check_mr_bloco2",
+           BASE / "2-Checks", "consolidado_check_mr_bloco2", "PxQ bloco 2 (BW)"),
     "samp": (BASE.parents[1] / "SAMP" / "1-Entrega" / "checks" / "resultados", "check_pxq_samp_mr",
              BASE.parents[1] / "SAMP" / "1-Entrega" / "checks", "consolidado_check_pxq_samp_mr",
              "PxQ SAMP bloco 2"),

@@ -17,7 +17,7 @@ Entradas:
 - src/SP_mercado_receita.xlsx (lado MR, filtrado por AnoMes)
 - tbl/tarifas/tarifa_long.csv (tarifas homologadas, so para separar demanda e energia)
 
-Saida: 3-Checks/receita_faturada_MR/receita_faturada_MR_<ref>.xlsx com as abas
+Saida: 2-Checks/receita_faturada_MR/receita_faturada_MR_<ref>.xlsx com as abas
 PxQ, MR, check (formulas Excel: PxQ - MR, mesma celula) e Conciliacao.
 Com mais de um mes, grava tambem consolidado_receita_faturada_MR_<ini>_a_<fim>.xlsx: uma linha
 por mes (soma de todas as linhas do layout), nas abas PxQ, MR e check (formulas). A coluna
@@ -64,7 +64,7 @@ BASE = Path(os.environ.get("PXQ_BASE", r"C:\python_projects\claude\p_x_q\SP\BW")
 DIR_RF = BASE / "1-Entrega" / "receita_faturada"
 ARQ_MR = BASE / "src" / "SP_mercado_receita.xlsx"
 ARQ_TARIFA = BASE / "tbl" / "tarifas" / "tarifa_long.csv"
-DIR_SAIDA = BASE / "3-Checks" / "receita_faturada_MR"
+DIR_SAIDA = BASE / "2-Checks" / "receita_faturada_MR"
 ABRIR_CLASSES = False                                              # True: one row per class (model grid)
 ROTULO_SEM_CLASSE = "Todas as classes"
 
@@ -273,7 +273,7 @@ def le_pxq(ref):
 
 
 def grade_modelo():
-    sys.path.insert(0, str(BASE / "2-Apoio"))
+    sys.path.insert(0, str(BASE / "3-Py" / "1-Entrega"))
     from gera_receita_faturada import le_modelo                  # noqa: E402
     _, _, _, grade = le_modelo()
     return [(op, cl, u) for _, op, cl, u in grade]

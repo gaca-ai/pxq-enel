@@ -36,7 +36,7 @@ LIVRE; SD generators billed on a load tariff (EMAE pumping stations) -> LIVRE.
 Usage:
     python check_mr_bloco2.py 2026-03
 Reads  1-Entrega/pxq/pxq_<ref>.xlsx and the MR of the month (le_mr.py: single-month file or tariff-period file)
-Writes 3-Checks/resultados/check_mr_bloco2_<ref>.xlsx
+Writes 2-Checks/resultados/check_mr_bloco2_<ref>.xlsx
 """
 import os
 import re
@@ -55,7 +55,7 @@ BASE = Path(os.environ.get("PXQ_BASE", r"C:\python_projects\claude\p_x_q\SP\BW")
 REF = sys.argv[1] if len(sys.argv) > 1 else "2026-03"
 
 ARQ_PXQ = BASE / "1-Entrega" / "pxq" / f"pxq_{REF}.xlsx"
-SAIDA = BASE / "3-Checks" / "resultados" / f"check_mr_bloco2_{REF}.xlsx"
+SAIDA = BASE / "2-Checks" / "resultados" / f"check_mr_bloco2_{REF}.xlsx"
 
 NSA = "Não se aplica"
 GRAO = ["OPCAO", "SUBGRUPO"]

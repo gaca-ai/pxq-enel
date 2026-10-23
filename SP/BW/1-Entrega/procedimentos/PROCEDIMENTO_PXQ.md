@@ -165,14 +165,14 @@ Renda (inclusive BPC, Indígena e Quilombola) ou Desconto Social. Essa marca é 
 As tarifas vêm de uma tabela única, `tbl/tarifas/tarifa_long.csv`. Ela traz uma linha por vigência,
 camada e chave, com as datas de início e fim de cada vigência.
 
-- **Como a tabela é gerada.** O script `2-Apoio/extrai_pcat.py` lê os PCATs publicados pela ANEEL.
+- **Como a tabela é gerada.** O script `3-Py/1-Entrega/extrai_pcat.py` lê os PCATs publicados pela ANEEL.
   As colunas são localizadas pelo nome, nunca pela posição, então um item novo publicado num ano
   futuro entra sem alteração de código.
 - **Camadas.** A camada financeira é calculada como TA − BE − CVA. O script confere que a identidade
   fecha em todas as vigências.
 - **Incluir uma vigência nova.** Uma vez por ano, quando a ANEEL publica o PCAT do reajuste:
   1. Salvar o PCAT em `src/pcats/`.
-  2. Em `2-Apoio/extrai_pcat.py`, acrescentar uma linha à lista `VIGENCIAS`, com o ano, o arquivo e
+  2. Em `3-Py/1-Entrega/extrai_pcat.py`, acrescentar uma linha à lista `VIGENCIAS`, com o ano, o arquivo e
      as datas de início e fim. Exemplo para o reajuste de 2027:
 
      ```python
@@ -180,7 +180,7 @@ camada e chave, com as datas de início e fim de cada vigência.
       "inicio": dt.date(2027, 7, 4), "fim": dt.date(2028, 7, 3)},
      ```
 
-  3. Rodar `python 2-Apoio/extrai_pcat.py`. O script regrava `tbl/tarifas/tarifa_long.csv` com todas
+  3. Rodar `python 3-Py/1-Entrega/extrai_pcat.py`. O script regrava `tbl/tarifas/tarifa_long.csv` com todas
      as vigências e confere TA = BE + CVA + FIN em cada uma.
 
   Os notebooks do P × Q e da RNF não mudam: ambos leem a mesma tabela e escolhem a vigência pelas
@@ -444,14 +444,40 @@ receita. As linhas entram com regime `direto` e diferença zero, identificadas n
 As conferências do SD comparam a receita aberta com a aba consolidada da planilha, cliente a
 cliente e no mesmo mês de referência.
 
+### Mudança prevista na fonte do SD (pendência P23)
+
+A planilha atual será substituída pelo arquivo `SD_consumo_demanda_receita_e_impostos.xlsx`, que
+traz, por agente e mês de competência, receita com tributos, PIS, COFINS, consumo e demanda. O total
+é igual à coluna "Geradoras + CERIS" da aba 3.2 do informe de gestão. A adaptação do notebook
+aguarda a área incluir no arquivo a separação de demanda e energia em ponta e fora ponta.
+
+Regras que valerão com o arquivo novo:
+
+- **Receita.** Receita do arquivo − PIS − COFINS, por agente e mês.
+- **Abertura dos agentes, exceto a CERIS.** Quantidade de cada posto × tarifa homologada da chave do
+  agente, como hoje.
+- **Abertura da CERIS (estimada).** A tabela homologada não tem o lado TE da CERIS, e o arquivo novo
+  não separa a receita em energia (TE) e uso da rede (TUSD).
+  - Demanda e energia TUSD: quantidade × tarifa homologada.
+  - Energia TE: a sobra da receita líquida, aberta pela composição da TE da CERIS copiada uma vez
+    da aba `SD tarifas` da planilha antiga para `tbl/tarifas` (cerca de 81% em Compra de Energia,
+    10% em ESS/ERR/ERCAP e o restante em Angra, Transporte Itaipu e Perdas). Essa composição é
+    revista a cada reajuste.
+  - A ultrapassagem de demanda da CERIS fica dentro dessa sobra.
+  - **Por que estimar.** O total da CERIS fica exato; só a divisão entre os itens é estimada. A
+    CERIS soma cerca de R$ 9 milhões por ano (0,03% da receita), e a energia TE estimada pesa 0,1%
+    em Compra de Energia. Não impacta o resultado final, e não justifica pedir à área o
+    detalhamento da receita.
+
 ## Passo 15 — Gerar a planilha
 
 A saída `1-Entrega/pxq/pxq_<ref>.xlsx` traz:
 
 | Aba | Conteúdo |
 |---|---|
+| `Leia-me` | O que contém cada aba do arquivo e quais scripts a usam |
 | `Componentes` | Os 37 itens na tarifa de aplicação, blocos 1 e 2, mais os totais de BE, CVA e FIN do bloco 2 |
-| `Componentes_BE` | Os mesmos itens na base econômica (é o que alimenta o layout final) |
+| `Componentes_BE` | Os mesmos itens na base econômica (é o que alimenta o layout final). No fim, os totais por camada dos dois blocos: `[2] Total TA/BE/CVA/FIN` e `[1] Total TA/BE/CVA/FIN` (estes usados pelo check tarifa homologada × tarifa realizada) |
 | `Familias` | As sete famílias, nas quatro camadas, blocos 1 e 2 |
 | `Nao_tarifaveis_linha` | Cada lançamento não tarifável do BW, linha a linha, com classe e mercado |
 | `Calibracao_subgrupo`, `Calibracao_classe` | Só nos meses de reajuste: o peso estimado de cada vigência e a conferência por classe (Passo 7b) |
@@ -470,9 +496,11 @@ Nas abas de itens e famílias, os lançamentos fora da conta aparecem no fim, ma
 
 ## Conversão para o layout Receita Faturada
 
-O script `2-Apoio/gera_receita_faturada.py` lê o pxq do mês e grava
+O script `3-Py/1-Entrega/gera_receita_faturada.py` lê o pxq do mês e grava
 `1-Entrega/receita_faturada/receita_faturada_<ref>.xlsx`, a partir do próprio modelo da área
-(`aux_files/De-Para_Modelo_PyC.xlsx`). Valores em R$ mil; só as linhas com valor.
+(`tbl/modelo/De-Para_Modelo_PyC.xlsx`). Valores em R$ mil; só as linhas com valor. O layout é montado
+pelo bloco 2; a função de conversão aceita o bloco como parâmetro, para que o check tarifa homologada ×
+tarifa realizada use exatamente a mesma regra com o bloco 1.
 
 - **Grupos tarifários (colunas I a X).** Base econômica do bloco 2, item a item, agrupada pelo
   de-para da aba `Instruções` do modelo. Se o modelo mudar o agrupamento, o conversor acompanha sem
@@ -514,7 +542,7 @@ O script `2-Apoio/gera_receita_faturada.py` lê o pxq do mês e grava
 ## Conferência anual contra o Mercado Receita
 
 Uma vez por ano, quando sai o Mercado Receita do reajuste (README 5.2), os scripts de
-`3-Checks/py/` comparam o bloco 2 com ele. Para que a comparação seja justa, três regras:
+`3-Py/2-Checks/` comparam o bloco 2 com ele. Para que a comparação seja justa, três regras:
 
 - **Agregação do MR.** O MR é mais detalhado que o BW. Os tipos de mercado, as faixas dos benefícios
   e o detalhe (fonte incentivada, APE, SCEE) são somados, e "livre APE" entra em livre.
@@ -528,22 +556,22 @@ A cobrança direta de ERCAP aos livres fica fora dos dois lados.
 
 ## Check do layout Receita Faturada contra o Mercado Receita
 
-O script `3-Checks/py/gera_receita_faturada_mr.py` monta o Mercado Receita (MR) no mesmo layout da
+O script `3-Py/2-Checks/gera_receita_faturada_mr.py` monta o Mercado Receita (MR) no mesmo layout da
 Receita Faturada e compara as duas versões célula a célula. Roda depois do conversor, porque lê o
 `receita_faturada_<ref>.xlsx` já gerado.
 
 ```
-python 3-Checks/py/gera_receita_faturada_mr.py 2026-05            # um mês
-python 3-Checks/py/gera_receita_faturada_mr.py 2026-01 2026-08    # intervalo
-python 3-Checks/py/gera_receita_faturada_mr.py --todos            # todos os receita_faturada
-python 3-Checks/py/gera_receita_faturada_mr.py --todos --classes  # abertura por classe
+python 3-Py/2-Checks/gera_receita_faturada_mr.py 2026-05            # um mês
+python 3-Py/2-Checks/gera_receita_faturada_mr.py 2026-01 2026-08    # intervalo
+python 3-Py/2-Checks/gera_receita_faturada_mr.py --todos            # todos os receita_faturada
+python 3-Py/2-Checks/gera_receita_faturada_mr.py --todos --classes  # abertura por classe
 ```
 
 Por padrão o check é aberto só por opção de compra × unidade (D/E), com as classes somadas na linha
 "Todas as classes". A abertura por classe fica disponível pelo parâmetro `ABRIR_CLASSES` no topo do
 script (padrão `False`) ou pela opção `--classes`.
 
-Saída: `3-Checks/receita_faturada_MR/receita_faturada_MR_<ref>.xlsx`. Quando o script roda para
+Saída: `2-Checks/receita_faturada_MR/receita_faturada_MR_<ref>.xlsx`. Quando o script roda para
 mais de um mês, grava também `consolidado_receita_faturada_MR_<ini>_a_<fim>.xlsx`: uma linha por mês
 (soma de todas as linhas do layout), com as mesmas colunas, nas abas `PxQ`, `MR` e `check`
 (fórmulas). A coluna "Obs. MR" marca o mês em que o MR é igual ao do mês anterior, ou seja,
@@ -631,6 +659,62 @@ projetado e sem valor de conferência.
 21. A classe principal "Não atribuído" é classificada pela categoria tarifária.
 22. UD/ER e Outros ficam antes de PIS/COFINS; a receita do pxq (BW + SD) está toda gravada no
     layout.
+
+## Check tarifa homologada × tarifa realizada (descontos tarifários)
+
+O script `3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py` monta o layout Receita Faturada duas
+vezes, pelo bloco 1 (tarifa homologada) e pelo bloco 2 (tarifa realizada, a entrega), e separa a
+diferença por origem. O objetivo é identificar os itens tarifários que recebem descontos.
+
+```
+python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py 2026-05            # um mês
+python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py 2026-01 2026-08    # intervalo
+python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py --todos            # todos os pxq
+```
+
+Saída: `2-Checks/receita_faturada_Bl1_vs_Bl2/receita_faturada_Bl1_vs_Bl2_<ref>.xlsx` e, com mais de
+um mês, o consolidado com uma linha por mês.
+
+| Aba | Conteúdo |
+|---|---|
+| `tarifa_homologada` | Layout pelo bloco 1 |
+| `tarifa_realizada` | Layout pelo bloco 2 (igual à entrega) |
+| `diferenca` | Fórmulas `tarifa_homologada − tarifa_realizada`, célula a célula; positivo = desconto |
+| `ta_somada` | Tarifa de aplicação somada (colunas I a Z), por opção × classe × unidade: tarifa homologada, tarifa realizada, diferença e a parte de cada origem |
+| `desconto_ape` | Parte da diferença que vem da isenção de encargos do APE |
+| `desconto_fonte_incentivada` | Parte que vem do desconto de fonte incentivada (1ª passada) |
+| `ajuste_2a_passada` | Ajuste de fechamento; não é desconto |
+| `conciliacao` | APE + fonte incentivada + 2ª passada = diferença, e conferência com os ajustes que o notebook grava em `Componentes` |
+
+**Regras**
+
+1. O layout de cada bloco é montado pela mesma função da entrega (`gera_receita_faturada.py`), com a
+   mesma grade, de-para, classes e unidades. As linhas são todas as do modelo (opção × classe ×
+   unidade), inclusive as zeradas.
+2. Bandeira, UD/ER, Outros, tributos e consumo não dependem do bloco: são iguais nos dois lados e a
+   diferença nessas colunas é zero.
+3. A separação por origem segue a ordem em que o notebook aplica as etapas do bloco 2 (Passo 9),
+   linha a linha do pxq:
+   - **2ª passada:** fator único sobre todos os itens da linha, f = bloco 2 ÷ (bloco 2 − ajuste da
+     2ª passada). O valor antes da 2ª passada é o bloco 2 ÷ f, item a item e camada a camada.
+   - **Fonte incentivada:** diferença entre o bloco 1 e o valor antes da 2ª passada nos itens de
+     Fio A e Fio B, os únicos em que a 1ª passada atua.
+   - **APE:** a mesma diferença nos demais itens (a isenção do APE atua nos encargos).
+4. Base CVA e Base Financeira: a parte da 2ª passada é exata. Entre APE e fonte incentivada, a soma
+   CVA + FIN de cada origem é exata; a divisão entre CVA e FIN segue a proporção da própria linha.
+   Só é aproximada nas linhas que têm as duas etapas.
+5. Geradoras, suprimentos e uso da distribuição (SD) não passam pelo bloco 2 e não têm origem
+   atribuída.
+6. O total de cada origem fecha com os ajustes gravados pelo notebook (aba `conciliacao`).
+
+**Limites do check**
+
+- O bloco 1 já sai com os benefícios sociais (Tarifa Social e Desconto Social) e com a tarifa
+  própria das subclasses (Passos 7 e 8), e com a tarifa proporcional nos meses de reajuste. Por
+  isso esses descontos não aparecem na diferença; a informação da Baixa Renda vem de outra fonte.
+- Nem todo desconto da diferença é bancado pela CDE (Conta de Desenvolvimento Energético). O
+  desconto de fonte incentivada é; a isenção do APE e o ajuste da 2ª passada precisam ser lidos à
+  parte.
 
 ---
 
