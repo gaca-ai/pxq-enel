@@ -106,6 +106,17 @@ estão. Por isso os comandos acima rodam a partir de `SP/BW`.
 3. Uma vez por ano, quando sai o Mercado Receita do reajuste, rodar os checks de `3-Py/2-Checks/`,
    inclusive o `gera_receita_faturada_mr.py`, depois do passo 2.
 
+### Versões
+
+O desenvolvimento segue no branch `main`. As versões fechadas ficam marcadas por tag no Git:
+
+| Tag | Versão |
+|---|---|
+| `vf-base1-antes-acrescimo-novas-colunas` | Versão final para a extração do BW em Excel (`Receita de Fornecimento Jan a Ago-26 com subclasse.xlsx`), de janeiro a agosto de 2026, antes da base em parquet com as colunas novas: data de leitura e de faturamento, indicador e referência original do refaturamento e identificação do TOI. |
+
+Para consultar uma versão: no GitHub Desktop, aba **History**, o commit marcado com a tag; no
+GitHub, **Tags**, onde o código daquela versão pode ser baixado.
+
 ## 3. Embasamento regulatório
 
 Esta seção reúne as normas que determinam como cada parte da receita deve ser calculada. Cada
