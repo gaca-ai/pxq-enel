@@ -70,14 +70,28 @@ Os meses que já têm zip e parquet são pulados; `--forcar` refaz todos a parti
 
 **Leitura no notebook.** O parquet traz, além das colunas da extração antiga, o lote de leitura
 (Conjunto de Contrato), a data de faturamento, a referência original e o indicador de refaturamento.
-Por enquanto essas quatro são somadas, e a base fica no mesmo grão da extração antiga. Cada linha é
-uma combinação de:
+Cada lançamento recebe um **tipo de faturamento**, que preenche a coluna `TipoFaturamento` do layout
+Receita Faturada:
+
+| Tipo | Regra |
+|---|---|
+| `CNR` | Operação principal "Faturamento Manual de Energia": o TOI (Termo de Ocorrência e Inspeção). Vale mesmo quando o lançamento também tem o indicador de refaturamento. |
+| `REFAT` | Indicador de refaturamento = X. O estorno da conta original e a conta nova vêm em pares, ambos marcados; os dois entram, e o REFAT fica líquido. |
+| `FAT` | Os demais lançamentos. |
+
+Lançamentos sem o X com mês de referência antigo são faturamento normal (FAT). Os tributos vêm do
+BW numa operação própria ("R/Não atribuído"), sem identificação de TOI: os tributos do TOI ficam em
+FAT; os do refaturamento têm o X e ficam em REFAT.
+
+Lote, data de faturamento e referência original são somados. Cada linha da base no notebook é uma
+combinação de:
 
 - categoria tarifária (que contém o subgrupo e a modalidade);
 - código estatístico (`ZQC` para consumo, `ZQD` para demanda);
 - operação e suboperação;
 - classe e subclasse;
-- mercado (cativo, livre ou híbrido).
+- mercado (cativo, livre ou híbrido);
+- tipo de faturamento.
 
 A coluna de montante é a **receita registrada**. É ela que o resultado final precisa reproduzir. Os
 totais de consumo (TUSD + TE, em kWh) e de demanda (TUSD + faturada, em kW) são calculados na leitura,
@@ -320,7 +334,8 @@ da saída.
 
 **Agrupamento.** A saída traz uma linha por **grupo**, não por linha do BW. O grupo junta os
 lançamentos que descrevem o mesmo fornecimento: classe principal, categoria tarifária, operação,
-mercado, subclasse e chave. Os códigos do par TUSD/TE aparecem concatenados na mesma célula, e a
+mercado, subclasse, chave e tipo de faturamento. Como o tipo faz parte do grupo, FAT, REFAT e CNR
+passam pelo bloco 2 separados, e cada um fecha na própria receita. Os códigos do par TUSD/TE aparecem concatenados na mesma célula, e a
 coluna `Linhas de origem` guarda as linhas da extração que formam cada grupo.
 
 O agrupamento é necessário por causa do par TUSD/TE do cativo (Passos 5 e 6). Separadas, nenhuma
@@ -359,8 +374,10 @@ incidir. A terceira, a 2ª passada, é o único ajuste do processo.
 - A isenção de encargos do autoprodutor por equiparação aparece no BW em linhas sem quantidade:
   "TUSD - Desconto Consumo" e o estorno "Complemento Res. 166/05".
 - O valor líquido do mês é distribuído entre os grupos de energia TUSD do mesmo subgrupo,
-  modalidade e posto, na proporção da capacidade de isenção de cada grupo: quantidade × (tarifa do
-  livre − tarifa do APE).
+  modalidade e posto (e, havendo, da mesma subclasse), na proporção da capacidade de isenção de cada
+  grupo: quantidade × (tarifa do livre − tarifa do APE). O tipo de faturamento não entra nessa
+  escolha: as linhas APE com X vão para grupos FAT e REFAT pela capacidade de cada um. Por isso o
+  REFAT do layout difere do REFAT da base pelo APE marcado com X.
 - O abatimento atinge só os itens da TUSD em que as duas tarifas diferem. Na prática, CDE e PROINFA.
 - Quando o valor de um mês supera a capacidade de um grupo (crédito de meses anteriores), o
   excedente vai para os demais grupos do mesmo subgrupo e modalidade.
@@ -497,12 +514,13 @@ A saída `1-Entrega/pxq/pxq_<ref>.xlsx` traz:
 | `Componentes` | Os 37 itens na tarifa de aplicação, blocos 1 e 2, mais os totais de BE, CVA e FIN do bloco 2 |
 | `Componentes_BE` | Os mesmos itens na base econômica (é o que alimenta o layout final). No fim, os totais por camada dos dois blocos: `[2] Total TA/BE/CVA/FIN` e `[1] Total TA/BE/CVA/FIN` (estes usados pelo check tarifa homologada × tarifa realizada) |
 | `Familias` | As sete famílias, nas quatro camadas, blocos 1 e 2 |
-| `Nao_tarifaveis_linha` | Cada lançamento não tarifável do BW, linha a linha, com classe e mercado |
+| `Nao_tarifaveis_linha` | Cada lançamento não tarifável do BW, linha a linha, com classe, mercado e tipo de faturamento |
 | `Calibracao_subgrupo`, `Calibracao_classe` | Só nos meses de reajuste: o peso estimado de cada vigência e a conferência por classe (Passo 7b) |
 | `Diferencas_linha`, `Diferencas_grupo` | Só com `APLICAR_2A_PASSADA` desligado |
 
-Nas abas de itens e famílias, os lançamentos fora da conta aparecem no fim, marcados em
-`Tarifável?`:
+Todas as abas trazem a coluna `Tipo de faturamento` (FAT, REFAT ou CNR; o SD é sempre FAT). Nas abas
+de itens e famílias, os lançamentos fora da conta aparecem no fim, agrupados também por tipo de
+faturamento e marcados em `Tarifável?`:
 
 - **NÃO:** sem tarifa homologada.
 - **SEM TARIFA:** lançamento de fornecimento cuja chave não existe na tabela. É o que merece
@@ -526,9 +544,10 @@ tarifa realizada use exatamente a mesma regra com o bloco 1.
 - **Base Financeira e Base CVA.** Totais de FIN e de CVA do bloco 2.
 - **Consumo.** MWh nas linhas de energia e MW nas de demanda.
 - **Opção de compra.** Cativo; livre (o híbrido entra como livre); geração, suprimento e uso da
-  distribuição para o SD. Todo o movimento é `FAT`, porque a extração não distingue refaturamento.
-  SCEE – GD1 e SCEE – GD2 não são preenchidos: o BW não identifica a instalação no SCEE, e o
+  distribuição para o SD. SCEE – GD1 e SCEE – GD2 não são preenchidos: o BW não identifica a instalação no SCEE, e o
   movimento desses clientes fica em cativo (README 6.1).
+- **Tipo de faturamento.** O modelo tem uma grade de 77 linhas para cada tipo (FAT, REFAT, CNR),
+  gravadas nessa ordem, pela coluna `Tipo de faturamento` do pxq (Passo 1). O SD é sempre FAT.
 - **Classe.** A classe do layout correspondente à do BW. Residencial Baixa Renda reúne Baixa Renda,
   BPC, Indígena, Quilombola e Desconto Social.
   - Lançamentos com classe principal "Não atribuído" são classificados pela categoria tarifária.
@@ -538,7 +557,8 @@ tarifa realizada use exatamente a mesma regra com o bloco 1.
   lançamento.
   - A parcela TE vai para a linha de energia.
   - A parcela TUSD e os tributos sem parcela, inclusive subvenções, são repartidos entre demanda e
-    energia na proporção da receita do bloco 2 da mesma opção e classe.
+    energia na proporção da receita do bloco 2 da mesma opção, classe e tipo de faturamento. Se o
+    tipo não tem bloco 2 nessa opção e classe, vale a proporção dos três tipos juntos.
 - **Conta COVID.** Entra em CDE Contas.
 - **UD/ER e Outros.** Duas colunas que não existem no modelo da área, inseridas antes de PIS/COFINS:
   - **UD/ER:** ultrapassagem de demanda e energia reativa (ultrapassagem, UFER, UFDR, demanda e
@@ -553,7 +573,8 @@ tarifa realizada use exatamente a mesma regra com o bloco 1.
   para Outros da linha GERAÇÃO / D, e o MWh, que não pode ser somado ao MW, aparece em nota na aba
   `Conferencia`.
 - **Aba `Conferencia`.** Concilia: receita total do pxq = valor gravado no layout + o que ficou fora.
-  Com as regras acima nada fica fora, e a diferença tem de ser zero. O total gravado é a receita
+  Com as regras acima nada fica fora, e a diferença tem de ser zero. A aba traz também o total
+  gravado por tipo de faturamento. O total gravado é a receita
   bruta do BW mais o SD, a mesma base da aba 3.2 do informe de gestão. A diferença para o informe
   vem só do SD (PIS/COFINS das geradoras e receita que falte na planilha do SD).
 
@@ -673,7 +694,8 @@ projetado e sem valor de conferência.
 
 *Lado PxQ (herdado do receita_faturada)*
 
-20. Todo o movimento entra como FAT; o híbrido entra como LIVRE.
+20. As linhas FAT, REFAT e CNR do layout do PxQ são somadas por opção × classe × unidade; o MR não
+    distingue tipo de faturamento. O híbrido entra como LIVRE.
 21. A classe principal "Não atribuído" é classificada pela categoria tarifária.
 22. UD/ER e Outros ficam antes de PIS/COFINS; a receita do pxq (BW + SD) está toda gravada no
     layout.
@@ -691,7 +713,8 @@ python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py --todos            # to
 ```
 
 Saída: `2-Checks/receita_faturada_Bl1_vs_Bl2/receita_faturada_Bl1_vs_Bl2_<ref>.xlsx` e, com mais de
-um mês, o consolidado com uma linha por mês.
+um mês, o consolidado com uma linha por mês. Os três tipos de faturamento são somados em cada linha
+de opção × classe × unidade.
 
 | Aba | Conteúdo |
 |---|---|

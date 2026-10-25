@@ -11,12 +11,15 @@ Regras (README, secao 5.1):
 - Colunas I a X: bloco 2 na camada BE, componente a componente, pelo de-para da
   aba "Instrucoes" do proprio modelo (colunas L e N). Y = Base Financeira (total FIN),
   Z = Base CVA (total CVA). H = quantidade em MWh (Unidade E) ou MW (Unidade D).
-- TipoFaturamento = FAT. Hibrido entra como LIVRE. Baixa Renda reune Baixa Renda,
+- TipoFaturamento pela coluna "Tipo de faturamento" do pxq: CNR (TOI, Faturamento Manual de
+  Energia), REFAT (flag de refaturamento X) e FAT (demais e todo o SD). Cada tipo tem a propria
+  grade de 77 linhas no modelo, na ordem FAT, REFAT, CNR. Hibrido entra como LIVRE. Baixa Renda reune Baixa Renda,
   BPC, Indigena, Quilombola e Desconto Social.
 - AA (Bandeira): Grp.estatists.quant. nos 8 codigos de bandeira, unidade E.
 - AB (PIS/COFINS) e AC (ICMS): Operacao principal R/#. Parcela TE vai para a linha E;
   parcela TUSD e os sem parcela (inclusive subvencoes) sao repartidos entre D e E na
-  proporcao da receita TUSD (ou total) do bloco 2 da mesma opcao x classe.
+  proporcao da receita TUSD (ou total) do bloco 2 da mesma opcao x classe e tipo de faturamento
+  (sem bloco 2 no tipo, vale a proporcao de todos os tipos juntos).
 - ZQC237 (Encargo da conta COVID) entra em CDE CONTAS, unidade E.
 - UD/ER (coluna nova, antes de PIS/COFINS): ultrapassagem de demanda e energia reativa
   (ultrapassagem, UFER, UFDR, demanda e energia reativa excedente).
@@ -65,6 +68,8 @@ CLASSE = {"Residencial": "Residencial", "Industrial": "Industrial", "Comercial, 
           "Serviço Público": "Serviços Públicos", "Consumo Próprio": "Consumo Próprio"}
 OPCOES_SD = {"GERAÇÃO", "SUPRIMENTO", "USO D"}                     # SD options: class = option
 COL_ID = ["Responsável", "Competência", "TipoFaturamento", "OpcaoCompra", "Classe", "Unidade"]
+TIPOS = ("FAT", "REFAT", "CNR")                                    # billing types, in the model order
+COL_TIPO = "Tipo de faturamento"
 COL_UDER, COL_OUTROS = "UD/ER", "Outros"                          # new columns, before PIS/COFINS
 PADRAO_UDER = "ULTRAPA|UFER|UFDR|REATIV"
 PADRAO_UNID_D = "DEMANDA|POTÊNCIA|POTENCIA|\\(KW\\)|UFDR|CONEX"
@@ -113,7 +118,7 @@ def classe_modelo(classe_principal, subclasse, categoria=None):
 def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None):
     """Layout of month `ref` from the pxq, using the component columns of `bloco` ("[2]" = the
     delivery). `prepara(comp, be)` may add in-memory blocks; with grava=False nothing is written and
-    the layout table (R$, indexed by option x class x unit) is returned."""
+    the layout table (R$, indexed by option x class x unit, billing types summed) is returned."""
     arq = DIR_PXQ / f"pxq_{ref}.xlsx"
     comp = pd.read_excel(arq, "Componentes")
     be = pd.read_excel(arq, "Componentes_BE")
@@ -127,6 +132,7 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     tar = be[be["Tarifável?"] == "SIM"].copy()
     tar_ta = comp.loc[tar.index]                                   # same row order in both sheets
     tar["OPCAO"] = tar["Flag Cli.Liv./ Cat."].map(OPCAO)
+    tar["TIPO"] = tar[COL_TIPO].fillna("FAT") if COL_TIPO in tar else "FAT"
     sd = tar["Source"] == "SD"
     tar["CLASSE"] = [o if s else classe_modelo(c, sc, ct) for o, s, c, sc, ct in
                      zip(tar["OPCAO"], sd, tar["Classe principal"], tar["Classe/Sub-classe"],
@@ -164,14 +170,19 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     for (o, cl), r in tar[~ok_tar].groupby(["Flag Cli.Liv./ Cat.", "Classe principal"], dropna=False):
         fora.append(("Classe/opcao sem correspondencia no modelo", f"{o} / {cl}",
                      r["RECEITA DE FORNECIMENTO"].sum()))
-    t = tar[ok_tar]
+    for tp, r in tar[ok_tar & ~tar["TIPO"].isin(TIPOS)].groupby("TIPO"):
+        fora.append(("Tipo de faturamento sem grade no modelo", tp, r["RECEITA DE FORNECIMENTO"].sum()))
+    t = tar[ok_tar & tar["TIPO"].isin(TIPOS)]
     blocos = [c for c in valores if c in t.columns]
-    agg = t.groupby(["OPCAO", "CLASSE", "UNIDADE"])[blocos + ["PESO_TUSD", "PESO_TOTAL"]].sum()
-    residuo = t.groupby(["OPCAO", "CLASSE", "UNIDADE"])["RESIDUO"].sum()
+    chave = ["TIPO", "OPCAO", "CLASSE", "UNIDADE"]
+    agg = t.groupby(chave)[blocos + ["PESO_TUSD", "PESO_TOTAL"]].sum()
+    residuo = t.groupby(chave)["RESIDUO"].sum()
+    peso_todos = agg.groupby(level=[1, 2, 3])[["PESO_TUSD", "PESO_TOTAL"]].sum()   # all types together
 
     # ------------------------------------------------ non-tariff lines
     nt = nt.copy()
     nt["OPCAO"] = nt["Flag Cli.Liv./ Cat."].map(OPCAO)
+    nt["TIPO"] = nt[COL_TIPO].fillna("FAT") if COL_TIPO in nt else "FAT"
     nt["CLASSE"] = [o if o in OPCOES_SD else classe_modelo(c, s, ct) for o, c, s, ct in
                     zip(nt["OPCAO"], nt["Classe principal"], nt["Classe/Sub-classe"], nt["Categoria tarifa"])]
     mont = nt["Grp.estatísts.mont."].astype(str)
@@ -195,55 +206,64 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     for g, r in nt[nt["COLUNA"].notna() & ~usa].groupby(["Flag Cli.Liv./ Cat.", "Classe principal"], dropna=False):
         fora.append(("Nao tarifavel com classe sem correspondencia", " / ".join(map(str, g)),
                      r["RECEITA DE FORNECIMENTO"].sum()))
+    for tp, r in nt[usa & ~nt["TIPO"].isin(TIPOS)].groupby("TIPO"):
+        fora.append(("Tipo de faturamento sem grade no modelo", tp, r["RECEITA DE FORNECIMENTO"].sum()))
+    usa &= nt["TIPO"].isin(TIPOS)
 
     extra = {}
-    for (o, cl, col, parc), v in (nt[usa].groupby(["OPCAO", "CLASSE", "COLUNA", "PARCELA"])
-                                  ["RECEITA DE FORNECIMENTO"].sum().items()):
+    for (tp, o, cl, col, parc), v in (nt[usa].groupby(["TIPO", "OPCAO", "CLASSE", "COLUNA", "PARCELA"])
+                                      ["RECEITA DE FORNECIMENTO"].sum().items()):
         if parc == "TE" or parc == "UNID_E":
             partes = {"E": 1.0}
         elif parc == "UNID_D":
             partes = {"D": 1.0}
         else:
             peso = "PESO_TUSD" if parc == "TUSD" else "PESO_TOTAL"
-            w = {u: agg.loc[(o, cl, u), peso] if (o, cl, u) in agg.index else 0.0 for u in ("D", "E")}
+            w = {u: agg.loc[(tp, o, cl, u), peso] if (tp, o, cl, u) in agg.index else 0.0 for u in ("D", "E")}
+            if not w["D"] + w["E"]:                                 # no tariff block in this type
+                w = {u: peso_todos.loc[(o, cl, u), peso] if (o, cl, u) in peso_todos.index else 0.0
+                     for u in ("D", "E")}
             tot = w["D"] + w["E"]
             partes = {u: w[u] / tot for u in w} if tot else {"E": 1.0}
         for u, p in partes.items():
-            extra[(o, cl, u, col)] = extra.get((o, cl, u, col), 0.0) + v * p
-    for (o, cl, u), v in residuo.items():
+            extra[(tp, o, cl, u, col)] = extra.get((tp, o, cl, u, col), 0.0) + v * p
+    for (tp, o, cl, u), v in residuo.items():
         if abs(v) > 0.005:
-            extra[(o, cl, u, COL_OUTROS)] = extra.get((o, cl, u, COL_OUTROS), 0.0) + v
+            extra[(tp, o, cl, u, COL_OUTROS)] = extra.get((tp, o, cl, u, COL_OUTROS), 0.0) + v
 
     # ------------------------------------------------ assemble rows on the model grid
-    extra_df = (pd.Series(extra, dtype=float).rename_axis(["OPCAO", "CLASSE", "UNIDADE", "COLUNA"])
+    extra_df = (pd.Series(extra, dtype=float).rename_axis(chave + ["COLUNA"])
                 .unstack("COLUNA") if extra else pd.DataFrame())
-    tabela = (pd.concat([agg[blocos], extra_df]).groupby(level=[0, 1, 2]).sum()
+    tabela = (pd.concat([agg[blocos], extra_df]).groupby(level=[0, 1, 2, 3]).sum()
               .reindex(columns=valores).fillna(0.0))
 
     competencia = dt.datetime(int(ref[:4]), int(ref[5:7]), 1)
     na_grade = {(op, cl, u) for _, op, cl, u in grade}
-    for chave, r in list(tabela.iterrows()):
-        if chave in na_grade:
+    for k, r in list(tabela.iterrows()):
+        tp, k = k[0], k[1:]
+        if k in na_grade:
             continue
         valor = r.drop(cab["CONSUMO"]).sum()
-        alvo = (chave[0], chave[1], "D")
-        if chave[2] == "E" and alvo in na_grade:
+        alvo = (k[0], k[1], "D")
+        if k[2] == "E" and alvo in na_grade:
             # no E row in the model for this option (GERACAO): value goes to Outros of the D row;
             # the MWh cannot be added to MW and is only reported
-            if alvo not in tabela.index:
-                tabela.loc[alvo, :] = 0.0
-            tabela.loc[alvo, COL_OUTROS] += valor
-            notas.append(f"{' / '.join(chave)} sem linha E no modelo: R$ {valor:,.2f} gravados em "
+            if (tp,) + alvo not in tabela.index:
+                tabela.loc[(tp,) + alvo, :] = 0.0
+            tabela.loc[(tp,) + alvo, COL_OUTROS] += valor
+            notas.append(f"{tp} / {' / '.join(k)} sem linha E no modelo: R$ {valor:,.2f} gravados em "
                          f"Outros da linha D ({r[cab['CONSUMO']]:,.3f} MWh não gravados)")
         else:
-            fora.append(("Opcao x classe x unidade fora da grade do modelo", " / ".join(chave), valor))
-    for _, op, cl, u in grade:
-        if (op, cl, u) in tabela.index:
-            r = tabela.loc[(op, cl, u)]
-            if r.abs().sum() > 0.005:
-                linhas.append(["Faturamento", competencia, "FAT", op, cl, u] + list(r.values))
+            fora.append(("Opcao x classe x unidade fora da grade do modelo", " / ".join((tp,) + k), valor))
+    for tp in TIPOS:
+        for _, op, cl, u in grade:
+            if (tp, op, cl, u) in tabela.index:
+                r = tabela.loc[(tp, op, cl, u)]
+                if r.abs().sum() > 0.005:
+                    linhas.append(["Faturamento", competencia, tp, op, cl, u] + list(r.values))
     if not grava:
-        return tabela[[k in na_grade for k in tabela.index]], valores
+        soma = tabela.groupby(level=[1, 2, 3]).sum()                # billing types summed
+        return soma[[k in na_grade for k in soma.index]], valores
 
     # ------------------------------------------------ write output from the template
     wb = openpyxl.load_workbook(ARQ_MODELO)
@@ -298,6 +318,10 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     for r in df_fora.sort_values(["Categoria", "R$"]).itertuples(index=False):
         ws_c.append(list(r))
     ws_c.append([])
+    ws_c.append(["Gravado por tipo de faturamento (R$)", None])
+    for tp in TIPOS:
+        ws_c.append([tp, sum(sum(v for v in l[7:]) for l in linhas if l[2] == tp)])
+    ws_c.append([])
     for nota in notas:
         ws_c.append([nota])
     ws_c.append(["Pendência: SCEE - GD1 / SCEE - GD2 não são separados (o BW não identifica a instalação no SCEE; README 6.1); "
@@ -313,7 +337,9 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     DIR_SAIDA.mkdir(parents=True, exist_ok=True)
     saida = DIR_SAIDA / f"receita_faturada_{ref}.xlsx"
     wb.save(saida)
-    print(f"{ref}: {len(linhas)} linhas | gravado R$ {gravado/1e6:,.2f} mi | fora R$ "
+    por_tipo = " | ".join(f"{tp} {sum(sum(v for v in l[7:]) for l in linhas if l[2] == tp)/1e6:,.2f}"
+                         for tp in TIPOS)
+    print(f"{ref}: {len(linhas)} linhas ({por_tipo}) | gravado R$ {gravado/1e6:,.2f} mi | fora R$ "
           f"{df_fora['R$'].sum()/1e6:,.2f} mi | diferenca R$ {resumo['R$'].iloc[-1]:,.2f} | {saida.name}")
 
 

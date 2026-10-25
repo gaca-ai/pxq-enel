@@ -265,6 +265,9 @@ O notebook percorre as etapas abaixo. O porquê de cada uma está no
 - **Leitura do BW.** A extração de receita de fornecimento traz uma linha por categoria tarifária,
   código estatístico, operação, classe e mercado. A receita de cada linha é a referência que o
   resultado final precisa reproduzir.
+- **Tipo de faturamento.** Cada lançamento é classificado como CNR (TOI, operação "Faturamento
+  Manual de Energia"), REFAT (indicador de refaturamento X, estorno e conta nova) ou FAT (os demais).
+  O tipo segue pelo cálculo e preenche a coluna `TipoFaturamento` do layout.
 - **Separação do que é tarifa** (3.8). Só os 30 códigos estatísticos de consumo e demanda entram
   no cálculo. O restante é guardado linha a linha para a conversão final.
 - **Chave tarifária.** Cada lançamento recebe a combinação de subgrupo, modalidade, classe,
@@ -306,8 +309,9 @@ O notebook percorre as etapas abaixo. O porquê de cada uma está no
   planilha só deve ser usada se todas passarem: TA = BE + CVA + FIN; parte tarifável mais não
   tarifável igual ao total do BW; abatimento APE nunca maior que o desconto.
 - **Layout Receita Faturada** (3.8). O conversor leva a base econômica por grupo tarifário, os
-  totais de CVA e FIN, e os tributos e bandeiras aos campos do layout. Uma aba de conciliação
-  fecha o total com a receita do BW.
+  totais de CVA e FIN, e os tributos e bandeiras aos campos do layout, nas grades FAT, REFAT e CNR.
+  Uma aba de conciliação fecha o total com a receita do BW. Os tributos do TOI não são identificados
+  no BW e ficam em FAT.
 
 ## 5. Resultados obtidos
 

@@ -259,7 +259,8 @@ def lado_mr(ref, col_valor, grade_d):
 
 
 def le_pxq(ref):
-    """PxQ layout of the month: header, (opcao, classe, unidade) -> values, template workbook."""
+    """PxQ layout of the month: header, (opcao, classe, unidade) -> values (billing types summed),
+    template workbook."""
     wb = openpyxl.load_workbook(DIR_RF / f"receita_faturada_{ref}.xlsx")
     ws = wb["Receita Faturada"]
     cab = [ws.cell(3, c).value for c in range(1, ws.max_column + 1)]
@@ -268,7 +269,13 @@ def le_pxq(ref):
     for r in range(4, ws.max_row + 1):
         k = tuple(ws.cell(r, col[n]).value for n in ("OpcaoCompra", "Classe", "Unidade"))
         if all(k):
-            dados[k] = {n: ws.cell(r, col[n]).value for n in cab if n}
+            v = {n: ws.cell(r, col[n]).value for n in cab if n}
+            if k in dados:                                         # FAT, REFAT and CNR rows are summed
+                for n, x in v.items():
+                    if isinstance(x, (int, float)) and isinstance(dados[k].get(n), (int, float)):
+                        dados[k][n] += x
+            else:
+                dados[k] = v
     return wb, ws, col, dados
 
 
