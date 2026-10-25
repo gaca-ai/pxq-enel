@@ -63,6 +63,7 @@ SP/BW/
 │   └── consolidado_*.xlsx        consolidados mês a mês
 ├── 3-Py/                         todos os scripts Python, separados pela pasta que alimentam
 │   ├── 1-Entrega/
+│   │   ├── prepara_base_bw.py        csv do BW -> parquet limpo, conferido e compactado
 │   │   ├── extrai_pcat.py            gera a tabela de tarifas a partir dos PCATs
 │   │   └── gera_receita_faturada.py  converte o pxq no layout Receita Faturada
 │   └── 2-Checks/
@@ -77,6 +78,8 @@ SP/BW/
 │   ├── modelo/De-Para_Modelo_PyC.xlsx  modelo da área para o layout Receita Faturada
 │   └── calibracao/               histórico mensal usado na tarifa proporcional
 └── src/                          arquivos de origem (não editados pelo processo)
+    ├── csv_original/             extração mensal do BW, csv compactado (MM-AAAA_ENEL SP_RECEITA.zip)
+    └── parquet/                  a mesma extração em parquet limpo, lida pelo notebook
 ```
 
 | Pasta / arquivo | Para que serve |
@@ -89,6 +92,7 @@ SP/BW/
 | `2-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês (seção 5.4). |
 | `2-Checks/receita_faturada_Bl1_vs_Bl2/` | Um arquivo por mês com o layout pela tarifa homologada (bloco 1) e pela tarifa realizada (bloco 2), a diferença por fórmula e a diferença separada em APE, fonte incentivada e 2ª passada, e o consolidado com uma linha por mês (seção 5.5). |
 | `2-Checks/consolidado_*.xlsx` | Checks por família e camada e por opção de compra e subgrupo, consolidados mês a mês (seção 5.3). |
+| [`3-Py/1-Entrega/prepara_base_bw.py`](3-Py/1-Entrega/prepara_base_bw.py) | Converte a extração mensal do BW (csv de mais de 200 MB) em parquet limpo em `src/parquet/`, confere o total contra o próprio csv, compacta o csv em `src/csv_original/` e o apaga. Roda antes do notebook. |
 | [`3-Py/1-Entrega/extrai_pcat.py`](3-Py/1-Entrega/extrai_pcat.py) | Lê os PCATs (planilhas de cálculo tarifário da ANEEL) e grava `tbl/tarifas/tarifa_long.csv`. Roda uma vez a cada nova vigência tarifária. |
 | [`3-Py/1-Entrega/gera_receita_faturada.py`](3-Py/1-Entrega/gera_receita_faturada.py) | Converte o pxq no layout Receita Faturada: `python 3-Py/1-Entrega/gera_receita_faturada.py 2026-06` ou `--todos`. |
 | [`3-Py/2-Checks/`](3-Py/2-Checks/) | `check_mr_bloco2.py` compara o mês por opção de compra e subgrupo. `check_mr_camadas.py` compara por família e camada, mês a mês. `consolida_check_mr_bloco2.py` consolida vários meses. `le_mr.py` lê o Mercado Receita (também usado pelos checks do SAMP). `gera_receita_faturada_mr.py` monta o Mercado Receita no layout Receita Faturada e gera o check célula a célula: `python 3-Py/2-Checks/gera_receita_faturada_mr.py 2026-05` ou `--todos`. `gera_receita_faturada_bl1_vs_bl2.py` compara a tarifa homologada com a realizada e separa os descontos: `python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py --todos`. |
@@ -101,10 +105,12 @@ estão. Por isso os comandos acima rodam a partir de `SP/BW`.
 
 **Rotina mensal:**
 
-1. Definir `ABA_BW` e `REFERENCIA` no Passo 0 do notebook e executar.
-2. Rodar `python 3-Py/1-Entrega/gera_receita_faturada.py <ref>`.
-3. Uma vez por ano, quando sai o Mercado Receita do reajuste, rodar os checks de `3-Py/2-Checks/`,
-   inclusive o `gera_receita_faturada_mr.py`, depois do passo 2.
+1. Deixar o csv do mês em `src/csv_original/` e rodar `python 3-Py/1-Entrega/prepara_base_bw.py`
+   (converte em parquet, confere o total, compacta e apaga o csv).
+2. Definir `REFERENCIA` no Passo 0 do notebook e executar.
+3. Rodar `python 3-Py/1-Entrega/gera_receita_faturada.py <ref>`.
+4. Uma vez por ano, quando sai o Mercado Receita do reajuste, rodar os checks de `3-Py/2-Checks/`,
+   inclusive o `gera_receita_faturada_mr.py`, depois do passo 3.
 
 ### Versões
 

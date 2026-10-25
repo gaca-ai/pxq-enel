@@ -45,8 +45,8 @@ Tudo o que muda de um mês para outro está nesta célula. O restante do noteboo
 
 | Parâmetro | O que define | Quando mexer |
 |---|---|---|
-| `ABA_BW`, `REFERENCIA` | Aba da extração e mês de referência (`aaaa-mm`) | Todo mês |
-| `ARQ_BW`, `ARQ_SD` | Arquivos de origem em `src/` | Quando chegar um arquivo novo |
+| `REFERENCIA` | Mês de referência (`aaaa-mm`); o arquivo do BW do mês (`ARQ_BW`) sai dele | Todo mês |
+| `ARQ_SD` | Planilha do SD em `src/` (`SD_ENEL SP_completo.xlsx`) | Quando chegar um arquivo novo |
 | `APLICAR_2A_PASSADA` | Ligado: entrega padrão, fecha na receita. Desligado: o bloco 2 para antes do fechamento e as diferenças saem linha a linha, em arquivo com sufixo `_sem_2a_passada` | Para investigar diferenças |
 | `REGIME_APE` | Liga o tratamento da isenção do autoprodutor por equiparação (Passo 9) | Mantido ligado |
 | `CALIBRAR_TARIFA_PROPORCIONAL`, `N_MESES_CALIBRACAO` | Estimativa do peso de cada vigência nos meses de reajuste, e quantos meses (1 a 12) formam a régua | Mantidos; o padrão é 3 meses |
@@ -54,8 +54,24 @@ Tudo o que muda de um mês para outro está nesta célula. O restante do noteboo
 
 ## Passo 1 — Ler a extração do BW
 
-A extração "Receita de Fornecimento com subclasse" traz uma aba por mês, com cabeçalho na linha 40.
-Cada linha é uma combinação de:
+**Preparação (antes do notebook).** A extração mensal chega em csv (mais de 200 MB) e é deixada em
+`src/csv_original/`. O script `3-Py/1-Entrega/prepara_base_bw.py`:
+
+1. lê o csv (separador `;`, UTF-8, 4 linhas de cabeçalho, números no formato brasileiro);
+2. grava o parquet limpo em `src/parquet/MM-AAAA_ENEL SP_RECEITA.parquet`: nomes de coluna únicos,
+   números e datas convertidos, só a coluna "Resultado" de cada medida, sem a linha de total. Quando
+   o BW grava a unidade junto do número ("6.481.782 KW"), ela é retirada; quando imprime "*" no
+   Resultado (unidades misturadas), o valor é a soma das colunas kW, kW.h e "Não atribuído";
+3. confere as cinco medidas contra a linha "Result.global" do csv: montante ao centavo e
+   quantidades com tolerância de 1 parte em 10 mil (o BW arredonda as quantidades linha a linha);
+4. só se a conferência passar, compacta o csv em `src/csv_original/` (mesmo nome, `.zip`) e o apaga.
+
+Os meses que já têm zip e parquet são pulados; `--forcar` refaz todos a partir dos zips.
+
+**Leitura no notebook.** O parquet traz, além das colunas da extração antiga, o lote de leitura
+(Conjunto de Contrato), a data de faturamento, a referência original e o indicador de refaturamento.
+Por enquanto essas quatro são somadas, e a base fica no mesmo grão da extração antiga. Cada linha é
+uma combinação de:
 
 - categoria tarifária (que contém o subgrupo e a modalidade);
 - código estatístico (`ZQC` para consumo, `ZQD` para demanda);
@@ -63,7 +79,9 @@ Cada linha é uma combinação de:
 - classe e subclasse;
 - mercado (cativo, livre ou híbrido).
 
-A coluna de montante é a **receita registrada**. É ela que o resultado final precisa reproduzir.
+A coluna de montante é a **receita registrada**. É ela que o resultado final precisa reproduzir. Os
+totais de consumo (TUSD + TE, em kWh) e de demanda (TUSD + faturada, em kW) são calculados na leitura,
+como as antigas colunas de controle da extração em Excel.
 
 Essa base é a mesma do informe de gestão.
 
