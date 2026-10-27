@@ -156,7 +156,7 @@ BW e para que o conversor possa aproveitar o que interessa ao layout final.
 | Encargo da conta COVID (`ZQC237`) | Lançado sem quantidade | Grupo CDE Contas da Receita Faturada |
 | Reativos; ultrapassagem de demanda: cativo (`ZQD021`, `ZQD022`, `ZQD023`) e livre (`ZQD019`, `ZQD020`, `ZQD037`) | Multa sobre a demanda acima da contratada, sem item na tabela homologada | Coluna UD/ER da Receita Faturada |
 | Substituição tributária dos livres | Débito e crédito se anulam no mês | Coluna Outros da Receita Faturada (efeito zero) |
-| "TUSD - Desconto Consumo" e "Complemento Res. 166/05" | Isenção do APE, sem quantidade | Usados no Passo 9 |
+| "TUSD - Desconto Consumo" (`ZQC036`, `ZQC181`, `ZQC182`) e o estorno "Complemento Res. 166/05" (`ZQC059`, `ZQC183`, `ZQC184`) | Isenção do APE, sem quantidade | Usados no Passo 9 |
 | Acertos homologados pela CCEE, energia compensada fora ponta e intermediário, desconto comercial | Sem tarifa por item | Coluna Outros da Receita Faturada |
 
 Os tributos e as bandeiras são identificados pela regra da área de faturamento: operação principal
@@ -372,7 +372,8 @@ incidir. A terceira, a 2ª passada, é o único ajuste do processo.
 **1. Regime APE** (README 3.4). Linhas do grupo A no mercado livre.
 
 - A isenção de encargos do autoprodutor por equiparação aparece no BW em linhas sem quantidade:
-  "TUSD - Desconto Consumo" e o estorno "Complemento Res. 166/05".
+  "TUSD - Desconto Consumo" (`ZQC036`, `ZQC181`, `ZQC182`) e o estorno "Complemento Res. 166/05"
+  (`ZQC059`, `ZQC183`, `ZQC184`).
 - O valor líquido do mês é distribuído entre os grupos de energia TUSD do mesmo subgrupo,
   modalidade e posto (e, havendo, da mesma subclasse), na proporção da capacidade de isenção de cada
   grupo: quantidade × (tarifa do livre − tarifa do APE). O tipo de faturamento não entra nessa
