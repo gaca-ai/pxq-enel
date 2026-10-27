@@ -59,7 +59,7 @@ SP/BW/
 ├── 2-Checks/                     saídas das conferências
 │   ├── resultados/               um arquivo de conferência por mês
 │   ├── receita_faturada_MR/      layout Receita Faturada do MR e check PxQ − MR, por mês
-│   ├── receita_faturada_Bl0_vs_Bl2/  tarifa homologada × tarifa realizada e descontos por origem
+│   ├── receita_faturada_Bl1_vs_Bl2/  tarifa homologada × tarifa realizada e descontos por origem
 │   └── consolidado_*.xlsx        consolidados mês a mês
 ├── 3-Py/                         todos os scripts Python, separados pela pasta que alimentam
 │   ├── 1-Entrega/
@@ -72,7 +72,7 @@ SP/BW/
 │       ├── check_mr_camadas.py       check por família e camada
 │       ├── consolida_check_mr_bloco2.py  consolida o check por subgrupo
 │       ├── gera_receita_faturada_mr.py   layout Receita Faturada do MR e check célula a célula
-│       └── gera_receita_faturada_bl0_vs_bl2.py  tarifa homologada × tarifa realizada (descontos)
+│       └── gera_receita_faturada_bl1_vs_bl2.py  tarifa homologada × tarifa realizada (descontos)
 ├── tbl/
 │   ├── tarifas/tarifa_long.csv   tarifas homologadas, todas as vigências e camadas
 │   ├── modelo/De-Para_Modelo_PyC.xlsx  modelo da área para o layout Receita Faturada
@@ -90,7 +90,7 @@ SP/BW/
 | [`1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md`](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md) | Cada transformação do notebook e dos scripts, e o motivo dela. |
 | `2-Checks/resultados/` | Conferências mensais contra o Mercado Receita e a conferência contra o informe de gestão. |
 | `2-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês (seção 5.4). |
-| `2-Checks/receita_faturada_Bl0_vs_Bl2/` | Um arquivo por mês com o layout pela tarifa homologada (bloco 0) e pela tarifa realizada (bloco 2), a diferença por fórmula e a diferença separada em APE, fonte incentivada e 2ª passada, e o consolidado com uma linha por mês (seção 5.5). |
+| `2-Checks/receita_faturada_Bl1_vs_Bl2/` | Um arquivo por mês com o layout pela tarifa homologada (bloco 1) e pela tarifa realizada (bloco 2), a diferença por fórmula e a diferença separada em APE, fonte incentivada e 2ª passada, e o consolidado com uma linha por mês (seção 5.5). |
 | `2-Checks/consolidado_*.xlsx` | Checks por família e camada e por opção de compra e subgrupo, consolidados mês a mês (seção 5.3). |
 | [`3-Py/1-Entrega/prepara_base_bw.py`](3-Py/1-Entrega/prepara_base_bw.py) | Converte a extração mensal do BW (csv de mais de 200 MB) em parquet limpo em `src/parquet/`, confere o total contra o próprio csv, compacta o csv em `src/csv_original/` e o apaga. Roda antes do notebook. |
 | [`3-Py/1-Entrega/extrai_pcat.py`](3-Py/1-Entrega/extrai_pcat.py) | Lê os PCATs (planilhas de cálculo tarifário da ANEEL) e grava `tbl/tarifas/tarifa_long.csv`. Roda uma vez a cada nova vigência tarifária. |
@@ -224,8 +224,9 @@ aparece como "TAR.REDUZIDA RES.ANEEL 166/05".
 - Os itens isentos são zerados para essas subclasses.
 - O BW não informa quanto do consumo de cada cliente cai em cada faixa. A participação de cada
   faixa é estimada pela própria receita faturada.
-- O bloco 0 valoriza a Tarifa Social pela tarifa B1 subclasse Baixa Renda sem a redução; bloco 0 −
-  bloco 1 é a estimativa do valor reembolsado (seção 5.5).
+- No bloco 1, a Tarifa Social fica pela tarifa B1 subclasse Baixa Renda sem a redução; a faixa
+  gratuita estimada é a primeira etapa do bloco 2 e é a estimativa do valor reembolsado (seção 5.5).
+  O Desconto Social mantém as faixas no bloco 1.
 
 ### 3.6 Vigência tarifária e tarifa proporcional
 
@@ -297,6 +298,9 @@ O notebook percorre as etapas abaixo. O porquê de cada uma está no
   subgrupo pela receita dos clientes cativos sem benefício. Os meses normais servem de régua.
 
 **Bloco 2: aplicação dos descontos e ajuste de fechamento**
+
+- **Tarifa Social** (3.5). A faixa gratuita até 80 kWh, estimada pela receita, sai do bloco 1 das
+  linhas da Tarifa Social, item a item.
 
 - **Regime APE** (3.4). A isenção registrada no BW abate os encargos da TUSD de energia dos livres
   do grupo A.
@@ -527,8 +531,8 @@ Leitura:
 
 ### 5.5 Tarifa homologada × tarifa realizada: onde estão os descontos
 
-O script `3-Py/2-Checks/gera_receita_faturada_bl0_vs_bl2.py` monta o layout Receita Faturada pelo
-bloco 0 (tarifa homologada sem os descontos) e pelo bloco 2 (tarifa realizada, a entrega) e separa a
+O script `3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py` monta o layout Receita Faturada pelo
+bloco 1 (tarifa homologada sem os descontos) e pelo bloco 2 (tarifa realizada, a entrega) e separa a
 diferença em Tarifa Social – DMR, SCEE - Baixa Renda(\*), APE, fonte incentivada e 2ª passada, item a item. A DMR
 faturada do mês vem de `src/dmr_tarifa_social.csv` (informe de gestão). Regras e limites no
 [procedimento](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md), seção "Check tarifa homologada × tarifa
@@ -565,7 +569,7 @@ Leitura:
   Compra de Energia R$ 127,9 milhões, Parcela B R$ 112,4 milhões, Perdas R$ 23,8 milhões, Rede Básica
   R$ 23,2 milhões no período.
 - **Fora do check.** Desconto Social, isenção de encargos da Baixa Renda e as tarifas próprias das
-  subclasses ficam no bloco 0 e não aparecem na diferença: não são reembolsados pela CDE.
+  subclasses ficam no bloco 1 e não aparecem na diferença: não são reembolsados pela CDE.
 - **Consumo Próprio.** A 2ª passada do Consumo Próprio cativo é de R$ 2,6 milhões em maio: a tarifa
   cheia dá R$ 5,2 milhões e o faturado é R$ 2,6 milhões. A tarifa homologada é o valor do Mercado
   Receita (seção 5.4), o que indica que o faturamento cobra cerca de metade da tarifa no consumo
