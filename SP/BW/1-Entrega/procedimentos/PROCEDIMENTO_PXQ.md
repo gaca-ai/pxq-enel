@@ -363,6 +363,20 @@ O valor de `A` em cada benefício:
 É o mesmo tratamento que o Mercado Receita dá à Tarifa Social: energia isenta abatida, não tarifa
 reduzida. A participação estimada aparece na coluna `% energia na faixa 01`.
 
+**Bloco 0: a Tarifa Social sem a redução** (README 3.5). Para medir o benefício que a CDE reembolsa,
+as linhas da Tarifa Social (Baixa Renda, BPC, Indígena, Quilombola) são valorizadas também pela tarifa
+B1 subclasse Baixa Renda homologada, aplicada à quantidade toda, sem a redução de 100% até 80 kWh: é o
+valor `B` acima. As demais linhas, inclusive o Desconto Social, têm bloco 0 igual ao bloco 1.
+
+- A régua é a da ANEEL para o reembolso: a tarifa homologada da subclasse Baixa Renda, sem e com o
+  benefício, sem tributos e sem bandeiras (PRORET 5.2, §129 e §130).
+- O Desconto Social e a isenção de encargos (CDE, PROINFA, CDE COVID, CDE GD) ficam de fora: não são
+  reembolsados. O consumo isento é retirado do mercado de rateio da cota da CDE, e o custo vai para os
+  demais consumidores pela tarifa (PRORET 5.2, §81 e §91).
+- Bloco 0 − bloco 1 é o valor da faixa gratuita, item a item. Como a faixa é estimada pela receita, o
+  valor também é uma estimativa.
+- O bloco 0 só alimenta o check de descontos tarifários; a entrega continua sendo o bloco 2.
+
 ## Passo 9 — O bloco 2: aplicação dos descontos e ajuste de fechamento
 
 A diferença entre o bloco 1 e a receita é tratada em três etapas, nesta ordem. As duas primeiras
@@ -512,8 +526,8 @@ A saída `1-Entrega/pxq/pxq_<ref>.xlsx` traz:
 | Aba | Conteúdo |
 |---|---|
 | `Leia-me` | O que contém cada aba do arquivo e quais scripts a usam |
-| `Componentes` | Os 37 itens na tarifa de aplicação, blocos 1 e 2, mais os totais de BE, CVA e FIN do bloco 2 |
-| `Componentes_BE` | Os mesmos itens na base econômica (é o que alimenta o layout final). No fim, os totais por camada dos dois blocos: `[2] Total TA/BE/CVA/FIN` e `[1] Total TA/BE/CVA/FIN` (estes usados pelo check tarifa homologada × tarifa realizada) |
+| `Componentes` | Os 37 itens na tarifa de aplicação, blocos 1 e 2, mais os totais de BE, CVA e FIN do bloco 2; no fim, o bloco 0 item a item (`[0] <item>`) |
+| `Componentes_BE` | Os mesmos itens na base econômica (é o que alimenta o layout final). No fim, os totais por camada: `[2] Total TA/BE/CVA/FIN`, `[1] Total TA/BE/CVA/FIN` e `[0] Total TA/BE/CVA/FIN`, e o bloco 0 item a item (blocos 0 e 1 usados pelo check tarifa homologada × tarifa realizada) |
 | `Familias` | As sete famílias, nas quatro camadas, blocos 1 e 2 |
 | `Nao_tarifaveis_linha` | Cada lançamento não tarifável do BW, linha a linha, com classe, mercado e tipo de faturamento |
 | `Calibracao_subgrupo`, `Calibracao_classe` | Só nos meses de reajuste: o peso estimado de cada vigência e a conferência por classe (Passo 7b) |
@@ -703,30 +717,33 @@ projetado e sem valor de conferência.
 
 ## Check tarifa homologada × tarifa realizada (descontos tarifários)
 
-O script `3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py` monta o layout Receita Faturada duas
-vezes, pelo bloco 1 (tarifa homologada) e pelo bloco 2 (tarifa realizada, a entrega), e separa a
-diferença por origem. O objetivo é identificar os itens tarifários que recebem descontos.
+O script `3-Py/2-Checks/gera_receita_faturada_bl0_vs_bl2.py` monta o layout Receita Faturada duas
+vezes, pelo bloco 0 (tarifa homologada sem os descontos; Passo 8) e pelo bloco 2 (tarifa realizada, a
+entrega), e separa a diferença por origem. O objetivo é identificar os itens tarifários que recebem
+descontos, inclusive o benefício da Tarifa Social reembolsado pela CDE.
 
 ```
-python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py 2026-05            # um mês
-python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py 2026-01 2026-08    # intervalo
-python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py --todos            # todos os pxq
+python 3-Py/2-Checks/gera_receita_faturada_bl0_vs_bl2.py 2026-05            # um mês
+python 3-Py/2-Checks/gera_receita_faturada_bl0_vs_bl2.py 2026-01 2026-08    # intervalo
+python 3-Py/2-Checks/gera_receita_faturada_bl0_vs_bl2.py --todos            # todos os pxq
 ```
 
-Saída: `2-Checks/receita_faturada_Bl1_vs_Bl2/receita_faturada_Bl1_vs_Bl2_<ref>.xlsx` e, com mais de
+Saída: `2-Checks/receita_faturada_Bl0_vs_Bl2/receita_faturada_Bl0_vs_Bl2_<ref>.xlsx` e, com mais de
 um mês, o consolidado com uma linha por mês. Os três tipos de faturamento são somados em cada linha
 de opção × classe × unidade.
 
 | Aba | Conteúdo |
 |---|---|
-| `tarifa_homologada` | Layout pelo bloco 1 |
+| `tarifa_homologada` | Layout pelo bloco 0, com a observação de que a Tarifa Social está valorizada pela tarifa B1 subclasse Baixa Renda sem a redução |
 | `tarifa_realizada` | Layout pelo bloco 2 (igual à entrega) |
 | `diferenca` | Fórmulas `tarifa_homologada − tarifa_realizada`, célula a célula; positivo = desconto |
 | `ta_somada` | Tarifa de aplicação somada (colunas I a Z), por opção × classe × unidade: tarifa homologada, tarifa realizada, diferença e a parte de cada origem |
+| `desconto_tarifa_social_dmr` | Tarifa Social – DMR: a DMR faturada do mês, aberta pelos itens na proporção do estimado (bloco 0 − bloco 1) |
+| `scee_baixa_renda` | SCEE - Baixa Renda(\*): estimado − DMR; não é subsídio homologado (nota de rodapé na aba) |
 | `desconto_ape` | Parte da diferença que vem da isenção de encargos do APE |
 | `desconto_fonte_incentivada` | Parte que vem do desconto de fonte incentivada (1ª passada) |
 | `ajuste_2a_passada` | Ajuste de fechamento; não é desconto |
-| `conciliacao` | APE + fonte incentivada + 2ª passada = diferença, e conferência com os ajustes que o notebook grava em `Componentes` |
+| `conciliacao` | Tarifa Social + APE + fonte incentivada + 2ª passada = diferença, e conferência com os ajustes que o notebook grava em `Componentes` |
 
 **Regras**
 
@@ -735,8 +752,20 @@ de opção × classe × unidade.
    unidade), inclusive as zeradas.
 2. Bandeira, UD/ER, Outros, tributos e consumo não dependem do bloco: são iguais nos dois lados e a
    diferença nessas colunas é zero.
-3. A separação por origem segue a ordem em que o notebook aplica as etapas do bloco 2 (Passo 9),
-   linha a linha do pxq:
+3. A separação por origem segue a ordem em que o notebook aplica as etapas (Passos 8 e 9), linha a
+   linha do pxq:
+   - **Tarifa Social:** bloco 0 − bloco 1, o valor da faixa gratuita até 80 kWh, em duas partes:
+     - **Tarifa Social – DMR:** a DMR (Diferença Mensal de Receita) faturada do mês, lida de
+       `src/dmr_tarifa_social.csv` (informe de gestão, aba 1.2_Clientes Baixa Renda, coluna
+       "Subsídio Faturado – DMR"). É aberta pelos itens e camadas na proporção do estimado;
+     - **SCEE - Baixa Renda(\*):** estimado − DMR; não é subsídio homologado com a DMR. Nos clientes
+       Baixa Renda com geração distribuída, a energia compensada é faturada pela TE do SCEE, sem o
+       componente de energia (REN 1.000/2021, art. 655-I, §1º, II, "b"), e o benefício da Tarifa
+       Social também incide sobre ela (art. 655-G, §8º). O BW não identifica essa energia; valorizada
+       pela TE comum, ela infla o estimado. A explicação vai em nota de rodapé nas abas
+       `scee_baixa_renda`, `ta_somada` e `conciliacao` e no consolidado;
+     - mês sem DMR no arquivo: a Tarifa Social fica toda na linha DMR, com o valor estimado, e o
+       script avisa.
    - **2ª passada:** fator único sobre todos os itens da linha, f = bloco 2 ÷ (bloco 2 − ajuste da
      2ª passada). O valor antes da 2ª passada é o bloco 2 ÷ f, item a item e camada a camada.
    - **Fonte incentivada:** diferença entre o bloco 1 e o valor antes da 2ª passada nos itens de
@@ -751,12 +780,15 @@ de opção × classe × unidade.
 
 **Limites do check**
 
-- O bloco 1 já sai com os benefícios sociais (Tarifa Social e Desconto Social) e com a tarifa
-  própria das subclasses (Passos 7 e 8), e com a tarifa proporcional nos meses de reajuste. Por
-  isso esses descontos não aparecem na diferença; a informação da Baixa Renda vem de outra fonte.
-- Nem todo desconto da diferença é bancado pela CDE (Conta de Desenvolvimento Energético). O
-  desconto de fonte incentivada é; a isenção do APE e o ajuste da 2ª passada precisam ser lidos à
-  parte.
+- O Desconto Social, a isenção de encargos da Baixa Renda e as tarifas próprias das subclasses
+  (rural, irrigante) continuam dentro do bloco 0 e não aparecem na diferença. Os dois primeiros não
+  são reembolsados pela CDE (Passo 8).
+- A Tarifa Social depende da faixa de consumo estimada pela receita (Passo 8). A parte DMR é o valor
+  oficial; SCEE - Baixa Renda(\*) é a diferença atribuída à energia compensada dos clientes Baixa
+  Renda com geração distribuída, que o BW não identifica. A DMR precisa ser incluída todo mês em `src/dmr_tarifa_social.csv`.
+- Nem todo desconto da diferença é bancado pela CDE (Conta de Desenvolvimento Energético). A Tarifa
+  Social e o desconto de fonte incentivada são; a isenção do APE e o ajuste da 2ª passada precisam
+  ser lidos à parte.
 
 ---
 

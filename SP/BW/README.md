@@ -59,7 +59,7 @@ SP/BW/
 ├── 2-Checks/                     saídas das conferências
 │   ├── resultados/               um arquivo de conferência por mês
 │   ├── receita_faturada_MR/      layout Receita Faturada do MR e check PxQ − MR, por mês
-│   ├── receita_faturada_Bl1_vs_Bl2/  tarifa homologada × tarifa realizada e descontos por origem
+│   ├── receita_faturada_Bl0_vs_Bl2/  tarifa homologada × tarifa realizada e descontos por origem
 │   └── consolidado_*.xlsx        consolidados mês a mês
 ├── 3-Py/                         todos os scripts Python, separados pela pasta que alimentam
 │   ├── 1-Entrega/
@@ -72,7 +72,7 @@ SP/BW/
 │       ├── check_mr_camadas.py       check por família e camada
 │       ├── consolida_check_mr_bloco2.py  consolida o check por subgrupo
 │       ├── gera_receita_faturada_mr.py   layout Receita Faturada do MR e check célula a célula
-│       └── gera_receita_faturada_bl1_vs_bl2.py  tarifa homologada × tarifa realizada (descontos)
+│       └── gera_receita_faturada_bl0_vs_bl2.py  tarifa homologada × tarifa realizada (descontos)
 ├── tbl/
 │   ├── tarifas/tarifa_long.csv   tarifas homologadas, todas as vigências e camadas
 │   ├── modelo/De-Para_Modelo_PyC.xlsx  modelo da área para o layout Receita Faturada
@@ -90,7 +90,7 @@ SP/BW/
 | [`1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md`](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md) | Cada transformação do notebook e dos scripts, e o motivo dela. |
 | `2-Checks/resultados/` | Conferências mensais contra o Mercado Receita e a conferência contra o informe de gestão. |
 | `2-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês (seção 5.4). |
-| `2-Checks/receita_faturada_Bl1_vs_Bl2/` | Um arquivo por mês com o layout pela tarifa homologada (bloco 1) e pela tarifa realizada (bloco 2), a diferença por fórmula e a diferença separada em APE, fonte incentivada e 2ª passada, e o consolidado com uma linha por mês (seção 5.5). |
+| `2-Checks/receita_faturada_Bl0_vs_Bl2/` | Um arquivo por mês com o layout pela tarifa homologada (bloco 0) e pela tarifa realizada (bloco 2), a diferença por fórmula e a diferença separada em APE, fonte incentivada e 2ª passada, e o consolidado com uma linha por mês (seção 5.5). |
 | `2-Checks/consolidado_*.xlsx` | Checks por família e camada e por opção de compra e subgrupo, consolidados mês a mês (seção 5.3). |
 | [`3-Py/1-Entrega/prepara_base_bw.py`](3-Py/1-Entrega/prepara_base_bw.py) | Converte a extração mensal do BW (csv de mais de 200 MB) em parquet limpo em `src/parquet/`, confere o total contra o próprio csv, compacta o csv em `src/csv_original/` e o apaga. Roda antes do notebook. |
 | [`3-Py/1-Entrega/extrai_pcat.py`](3-Py/1-Entrega/extrai_pcat.py) | Lê os PCATs (planilhas de cálculo tarifário da ANEEL) e grava `tbl/tarifas/tarifa_long.csv`. Roda uma vez a cada nova vigência tarifária. |
@@ -212,11 +212,20 @@ aparece como "TAR.REDUZIDA RES.ANEEL 166/05".
 | Tarifa Social (Baixa Renda) | Até 80 kWh/mês, isenção total. Acima disso, tarifa B1 baixa renda. Isenção de CDE, PROINFA, CDE COVID e CDE GD. |
 | Desconto Social | Até 120 kWh/mês, tarifa residencial sem CDE, CDE COVID e CDE GD. Acima disso, tarifa residencial comum. |
 
+**Reembolso pela CDE (PRORET Submódulo 5.2, §81, §91, §129 e §130):**
+- Só a Tarifa Social é reembolsada à distribuidora. O valor é a diferença entre a receita pela tarifa
+  homologada B1 subclasse Baixa Renda e a receita com a redução, sem tributos e sem bandeiras.
+- A régua é a tarifa da própria subclasse Baixa Renda, e não a residencial comum.
+- A isenção de encargos (Baixa Renda e Desconto Social) não é reembolsada: o consumo isento sai do
+  mercado de rateio da cota da CDE, e o custo vai para os demais consumidores pela tarifa.
+
 **Impacto no cálculo:**
 
 - Os itens isentos são zerados para essas subclasses.
 - O BW não informa quanto do consumo de cada cliente cai em cada faixa. A participação de cada
   faixa é estimada pela própria receita faturada.
+- O bloco 0 valoriza a Tarifa Social pela tarifa B1 subclasse Baixa Renda sem a redução; bloco 0 −
+  bloco 1 é a estimativa do valor reembolsado (seção 5.5).
 
 ### 3.6 Vigência tarifária e tarifa proporcional
 
@@ -518,9 +527,10 @@ Leitura:
 
 ### 5.5 Tarifa homologada × tarifa realizada: onde estão os descontos
 
-O script `3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py` monta o layout Receita Faturada pelo
-bloco 1 (tarifa homologada) e pelo bloco 2 (tarifa realizada, a entrega) e separa a diferença em APE,
-fonte incentivada e 2ª passada, item a item. Regras e limites no
+O script `3-Py/2-Checks/gera_receita_faturada_bl0_vs_bl2.py` monta o layout Receita Faturada pelo
+bloco 0 (tarifa homologada sem os descontos) e pelo bloco 2 (tarifa realizada, a entrega) e separa a
+diferença em Tarifa Social – DMR, SCEE - Baixa Renda(\*), APE, fonte incentivada e 2ª passada, item a item. A DMR
+faturada do mês vem de `src/dmr_tarifa_social.csv` (informe de gestão). Regras e limites no
 [procedimento](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md), seção "Check tarifa homologada × tarifa
 realizada".
 
@@ -528,21 +538,34 @@ Diferença tarifa homologada − tarifa realizada (R$ milhões; positivo = desco
 
 | | jan | fev | mar | abr | mai | jun | jul | ago |
 |---|---|---|---|---|---|---|---|---|
+| Tarifa Social – DMR | 37,3 | 34,5 | 33,3 | 32,7 | 32,9 | 31,9 | 37,5 | 42,7 |
+| SCEE - Baixa Renda(\*) | 1,5 | 2,6 | 2,7 | 3,5 | 2,7 | 2,8 | 2,8 | 2,8 |
 | APE | 9,9 | 16,1 | 14,7 | 9,2 | 11,0 | 13,0 | 13,1 | 16,1 |
-| Fonte incentivada | 63,0 | 63,2 | 64,1 | 66,3 | 63,0 | 62,9 | 68,4 | 72,9 |
-| 2ª passada | −0,3 | −0,6 | −1,5 | −1,6 | 0,8 | −1,3 | 5,1 | 0,4 |
-| **Total** | **72,6** | **78,8** | **77,2** | **73,9** | **74,9** | **74,6** | **86,6** | **89,4** |
+| Fonte incentivada | 63,0 | 63,5 | 64,1 | 66,3 | 63,0 | 62,9 | 68,4 | 72,9 |
+| 2ª passada | −0,3 | −0,9 | −1,5 | −1,6 | 0,8 | −1,3 | 5,1 | 0,4 |
+| **Total** | **111,4** | **115,9** | **113,3** | **110,1** | **110,6** | **109,4** | **126,8** | **134,9** |
 
-O total é a linha (c) da seção 5.1; APE, fonte incentivada e 2ª passada são as linhas (d), (e) e (f)
-com o sinal invertido.
+O total sem a Tarifa Social é a linha (c) da seção 5.1; APE, fonte incentivada e 2ª passada são as
+linhas (d), (e) e (f) com o sinal invertido.
 
 Leitura:
 
 - **Fonte incentivada.** Cai só nos itens de rede: em maio, Parcela B (Fio B) R$ 37,9 milhões, Rede
   Básica R$ 24,2 milhões, Conexão T R$ 1,1 milhão e CUSD R$ 0,2 milhão.
 - **APE.** Cai só nos encargos: em maio, CDE USO R$ 8,8 milhões e PROINFA R$ 1,6 milhão.
-- **Fora do check.** Tarifa Social, Desconto Social e as tarifas próprias das subclasses já estão no
-  bloco 1 e não aparecem na diferença.
+- **Tarifa Social.** A linha DMR é o subsídio homologado: R$ 282,9 milhões de janeiro a agosto.
+- **SCEE - Baixa Renda(\*).** Não é subsídio homologado com a DMR: R$ 21,4 milhões no período, estável em
+  cerca de R$ 2,7 milhões por mês. Nos clientes Baixa Renda com geração distribuída, a energia
+  compensada é faturada pela TE do SCEE, sem o componente de energia (R$ 37,19 contra R$ 316,78/MWh;
+  REN 1.000/2021, art. 655-I), e o benefício da Tarifa Social também incide sobre ela (art. 655-G, §8º).
+  O BW não identifica essa energia, que é valorizada pela TE comum. Energia e receita da Baixa Renda no
+  BW batem com o informe de gestão; a diferença está só na tarifa.
+- **Tarifa Social + SCEE - Baixa Renda(\*)** (R$ 304,2 milhões, a faixa gratuita calculada) cai em todos
+  os itens:
+  Compra de Energia R$ 127,9 milhões, Parcela B R$ 112,4 milhões, Perdas R$ 23,8 milhões, Rede Básica
+  R$ 23,2 milhões no período.
+- **Fora do check.** Desconto Social, isenção de encargos da Baixa Renda e as tarifas próprias das
+  subclasses ficam no bloco 0 e não aparecem na diferença: não são reembolsados pela CDE.
 - **Consumo Próprio.** A 2ª passada do Consumo Próprio cativo é de R$ 2,6 milhões em maio: a tarifa
   cheia dá R$ 5,2 milhões e o faturado é R$ 2,6 milhões. A tarifa homologada é o valor do Mercado
   Receita (seção 5.4), o que indica que o faturamento cobra cerca de metade da tarifa no consumo
