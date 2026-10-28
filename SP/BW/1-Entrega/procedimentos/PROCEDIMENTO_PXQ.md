@@ -235,6 +235,42 @@ cobre, e a tarifa do mês é a média ponderada. Como a ponderação é linear, 
 continua exata. Nos meses de reajuste esse peso de calendário é apenas o ponto de partida; o
 Passo 7b o substitui por uma estimativa.
 
+**O calendário de leitura** (em implementação; substituirá o Passo 7b). O peso de cada vigência
+passa a vir do ciclo de leitura do lote do cliente, pela regra da ANEEL (README 3.6).
+
+- **Fonte.** O calendário de leitura da área (`ESCALA AT MT BTr e BT`), salvo em
+  `src/calendario_leitura_<ano>.xlsx`, uma aba por mês (`Jan` a `Dez`).
+- **Tabela.** O script `3-Py/1-Entrega/gera_calendario_leitura.py <ano>` grava
+  `tbl/calendario/calendario_leitura.csv`, uma linha por mês, grupo e lote: data de leitura, dias de
+  consumo e o ciclo (`INICIO_CICLO` = leitura − dias + 1; `FIM_CICLO` = leitura).
+  - Carrega só as abas presentes no arquivo e substitui apenas esses meses. O calendário pode chegar
+    incompleto e ser revisado ao longo do ano; basta rodar de novo.
+  - Para com erro se uma aba presente estiver sem algum lote. Avisa quando um ciclo não começa no
+    dia seguinte à leitura anterior.
+- **Grupos do calendário.**
+
+  | Grupo | Lotes | Data de leitura |
+  |---|---|---|
+  | `MT` (Média Tensão) | 1 a 17 | Coluna Data Leitura; todos os lotes têm a mesma data |
+  | `BT` (Baixa Tensão) | 1 a 20 | Coluna Data Leitura do lote |
+  | `TELE` (Telemedidos) | 40 e 42 | A "Leitura Real" do cabeçalho da seção: último dia do mês anterior. A coluna Data Leitura é a data de processamento |
+
+  O Cash Power não é carregado: não tem faturamento no BW.
+- **Ligação com o BW.** A tabela `tbl/calendario/de_para_lote.csv`, validada pela área do BW, dá o
+  grupo e o nº do lote do calendário para cada lote do BW (campo `Conjunto de Contrato`).
+  - O nome do lote é comparado em minúsculas: grafias que diferem só em maiúsculas são o mesmo lote.
+  - Regra geral: o número no nome indica o lote, no nível de tensão do sufixo (`_bt`, `_mt`).
+  - Sem número de lote (`cativos_at`, telemedição): vale a data única do grupo.
+  - `MES_CIVIL` (`ip_avencado`, `temporário aes eletropaulo`): faturados no último dia do mês; o
+    ciclo é o mês civil da referência.
+  - `SEM_FATURAMENTO` (`cashpower`): sem tarifa proporcional.
+  - Lote do BW que não está na tabela: fica com a tarifa do mês, sem proporcionalidade, e é listado
+    na aba `Lotes sem calendário`. A tabela é mantida à mão, com uma linha por lote novo.
+- **Peso de cada vigência.** Dias do ciclo em cada vigência ÷ dias do ciclo. Só os ciclos que
+  contêm a data do reajuste misturam vigências; nos demais o cálculo fica como hoje.
+- **Refaturamento e faturamento manual** (REFAT e CNR) ficam com a tarifa do mês, sem
+  proporcionalidade.
+
 ## Passo 5 — A quantidade
 
 O consumo é convertido de kWh para MWh, porque a tarifa de energia é publicada em R$/MWh. A demanda
@@ -285,6 +321,10 @@ O valor calculado é a soma dos 37 itens. A tarifa total publicada vem arredonda
 isso pode diferir alguns milhares de reais no mês de quem calcule pela tarifa total.
 
 ## Passo 7b — Tarifa proporcional nos meses de reajuste
+
+> Este passo será substituído pela tarifa proporcional por lote, a partir do calendário de leitura
+> (Passo 4). O BW passou a trazer o lote de cada cliente, o que torna a estimativa pela receita
+> desnecessária.
 
 **O problema.** A tarifa muda no reajuste anual (4 de julho em SP). Pela regra da ANEEL, quem tem o
 ciclo de leitura cruzando essa data paga parte pela tarifa antiga e parte pela nova, na proporção
@@ -818,3 +858,6 @@ de opção × classe × unidade.
 | Posto tarifário | Faixa horária: ponta, fora ponta, intermediário |
 | Cliente cativo | Compra energia e rede da distribuidora: paga TUSD e TE |
 | Cliente livre | Compra energia no mercado livre: paga só TUSD |
+| Lote de leitura | Grupo de clientes lidos na mesma data; no BW, campo `Conjunto de Contrato` |
+| Ciclo de leitura | Período de consumo entre duas leituras consecutivas do lote |
+| Telemedidos | Clientes com leitura remota; no calendário, lotes 40 e 42 |

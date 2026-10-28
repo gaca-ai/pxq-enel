@@ -65,6 +65,7 @@ SP/BW/
 │   ├── 1-Entrega/
 │   │   ├── prepara_base_bw.py        csv do BW -> parquet limpo, conferido e compactado
 │   │   ├── extrai_pcat.py            gera a tabela de tarifas a partir dos PCATs
+│   │   ├── gera_calendario_leitura.py  converte o calendário de leitura em tabela
 │   │   └── gera_receita_faturada.py  converte o pxq no layout Receita Faturada
 │   └── 2-Checks/
 │       ├── le_mr.py                  lê o Mercado Receita do mês
@@ -76,6 +77,8 @@ SP/BW/
 ├── tbl/
 │   ├── tarifas/tarifa_long.csv   tarifas homologadas, todas as vigências e camadas
 │   ├── modelo/De-Para_Modelo_PyC.xlsx  modelo da área para o layout Receita Faturada
+│   ├── calendario/calendario_leitura.csv  data de leitura e ciclo de cada lote, por mês
+│   ├── calendario/de_para_lote.csv  lote do BW -> lote do calendário de leitura
 │   └── calibracao/               histórico mensal usado na tarifa proporcional
 └── src/                          arquivos de origem (não editados pelo processo)
     ├── csv_original/             extração mensal do BW, csv compactado (MM-AAAA_ENEL SP_RECEITA.zip)
@@ -94,11 +97,13 @@ SP/BW/
 | `2-Checks/consolidado_*.xlsx` | Checks por família e camada e por opção de compra e subgrupo, consolidados mês a mês (seção 5.3). |
 | [`3-Py/1-Entrega/prepara_base_bw.py`](3-Py/1-Entrega/prepara_base_bw.py) | Converte a extração mensal do BW (csv de mais de 200 MB) em parquet limpo em `src/parquet/`, confere o total contra o próprio csv, compacta o csv em `src/csv_original/` e o apaga. Roda antes do notebook. |
 | [`3-Py/1-Entrega/extrai_pcat.py`](3-Py/1-Entrega/extrai_pcat.py) | Lê os PCATs (planilhas de cálculo tarifário da ANEEL) e grava `tbl/tarifas/tarifa_long.csv`. Roda uma vez a cada nova vigência tarifária. |
+| [`3-Py/1-Entrega/gera_calendario_leitura.py`](3-Py/1-Entrega/gera_calendario_leitura.py) | Lê o calendário de leitura (`src/calendario_leitura_<ano>.xlsx`, uma aba por mês) e grava `tbl/calendario/calendario_leitura.csv`: `python 3-Py/1-Entrega/gera_calendario_leitura.py 2026`. Carrega só as abas presentes e substitui apenas esses meses na tabela. |
 | [`3-Py/1-Entrega/gera_receita_faturada.py`](3-Py/1-Entrega/gera_receita_faturada.py) | Converte o pxq no layout Receita Faturada: `python 3-Py/1-Entrega/gera_receita_faturada.py 2026-06` ou `--todos`. |
 | [`3-Py/2-Checks/`](3-Py/2-Checks/) | `check_mr_bloco2.py` compara o mês por opção de compra e subgrupo. `check_mr_camadas.py` compara por família e camada, mês a mês. `consolida_check_mr_bloco2.py` consolida vários meses. `le_mr.py` lê o Mercado Receita (também usado pelos checks do SAMP). `gera_receita_faturada_mr.py` monta o Mercado Receita no layout Receita Faturada e gera o check célula a célula: `python 3-Py/2-Checks/gera_receita_faturada_mr.py 2026-05` ou `--todos`. `gera_receita_faturada_bl1_vs_bl2.py` compara a tarifa homologada com a realizada e separa os descontos: `python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py --todos`. |
-| `tbl/` | Tabelas do processo: tarifas homologadas, o histórico de calibração da tarifa proporcional e o modelo do layout Receita Faturada. |
+| `tbl/` | Tabelas do processo: tarifas homologadas, calendário de leitura, o histórico de calibração da tarifa proporcional e o modelo do layout Receita Faturada. |
+| `tbl/calendario/` | `calendario_leitura.csv`: uma linha por mês, grupo e lote, com a data de leitura, os dias de consumo e o início e fim do ciclo. `de_para_lote.csv`: o grupo e o nº do lote do calendário para cada lote do BW (campo `Conjunto de Contrato`), validado pela área do BW. Ambos em csv para facilitar a passagem para a TI. |
 | `tbl/modelo/De-Para_Modelo_PyC.xlsx` | Modelo da área para o layout Receita Faturada: a aba "Receita Faturada" define as colunas e a grade de linhas; a aba "Instruções", o de-para dos itens tarifários para os grupos do layout. Sem ele a Receita Faturada não é gerada. Não tem dados da Enel e é versionado no Git. |
-| `src/` | Fontes externas: a extração de receita do BW, a planilha do SD, os PCATs (`src/pcats/`) e o Mercado Receita do período tarifário. |
+| `src/` | Fontes externas: a extração de receita do BW, a planilha do SD, os PCATs (`src/pcats/`), o calendário de leitura (`calendario_leitura_<ano>.xlsx`) e o Mercado Receita do período tarifário. |
 
 Os scripts localizam os arquivos a partir da pasta `SP/BW` (variável `PXQ_BASE`), e não da pasta onde
 estão. Por isso os comandos acima rodam a partir de `SP/BW`.
@@ -109,7 +114,9 @@ estão. Por isso os comandos acima rodam a partir de `SP/BW`.
    (converte em parquet, confere o total, compacta e apaga o csv).
 2. Definir `REFERENCIA` no Passo 0 do notebook e executar.
 3. Rodar `python 3-Py/1-Entrega/gera_receita_faturada.py <ref>`.
-4. Uma vez por ano, quando sai o Mercado Receita do reajuste, rodar os checks de `3-Py/2-Checks/`,
+4. Quando chegar um calendário de leitura novo ou revisado: salvar em `src/calendario_leitura_<ano>.xlsx`
+   e rodar `python 3-Py/1-Entrega/gera_calendario_leitura.py <ano>`.
+5. Uma vez por ano, quando sai o Mercado Receita do reajuste, rodar os checks de `3-Py/2-Checks/`,
    inclusive o `gera_receita_faturada_mr.py`, depois do passo 3.
 
 ### Versões
@@ -242,8 +249,15 @@ número de dias de fornecimento entre duas leituras consecutivas. Em SP, o reaju
 4 de julho.
 
 **Impacto no cálculo:** no mês do reajuste e no seguinte, cada subgrupo tarifário mistura a tarifa
-antiga e a nova. A extração do BW não traz a data de leitura, por isso o peso de cada vigência é
-estimado pela receita.
+antiga e a nova. Até aqui, o peso de cada vigência é estimado pela receita (Passo 7b do
+procedimento).
+
+**Em implementação:** o peso passa a vir do ciclo de leitura de cada lote. O BW traz o lote do
+cliente (`Conjunto de Contrato`); o calendário de leitura dá a data de leitura e os dias de consumo
+de cada lote (`tbl/calendario/`). Só os ciclos que contêm a data do reajuste recebem tarifa
+proporcional; nos demais meses o cálculo não muda. Refaturamento (REFAT) e faturamento manual (CNR)
+ficam com a tarifa do mês: o REFAT exigiria o calendário e a tarifa do mês original, que pode ser de
+anos atrás, para um efeito pequeno; o CNR não tem ciclo de leitura.
 
 ### 3.7 ERCAP: Encargo de Potência para Reserva de Capacidade
 
