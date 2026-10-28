@@ -49,8 +49,7 @@ Tudo o que muda de um mês para outro está nesta célula. O restante do noteboo
 | `ARQ_SD` | Planilha do SD em `src/` (`SD_ENEL SP_completo.xlsx`) | Quando chegar um arquivo novo |
 | `APLICAR_2A_PASSADA` | Ligado: entrega padrão, fecha na receita. Desligado: o bloco 2 para antes do fechamento e as diferenças saem linha a linha, em arquivo com sufixo `_sem_2a_passada` | Para investigar diferenças |
 | `REGIME_APE` | Liga o tratamento da isenção do autoprodutor por equiparação (Passo 9) | Mantido ligado |
-| `CALIBRAR_TARIFA_PROPORCIONAL`, `N_MESES_CALIBRACAO` | Estimativa do peso de cada vigência nos meses de reajuste, e quantos meses (1 a 12) formam a régua | Mantidos; o padrão é 3 meses |
-| `DIAS_POR_SUBGRUPO` | Peso manual de cada vigência por subgrupo; prevalece sobre a estimativa | Só se o faturamento informar o calendário de leitura |
+| `ARQ_CALENDARIO`, `ARQ_DE_PARA_LOTE` | Calendário de leitura e de-para dos lotes, em `tbl/calendario/` (Passo 4) | Não mudam; as tabelas é que são atualizadas |
 
 ## Passo 1 — Ler a extração do BW
 
@@ -61,7 +60,10 @@ Tudo o que muda de um mês para outro está nesta célula. O restante do noteboo
 2. grava o parquet limpo em `src/parquet/MM-AAAA_ENEL SP_RECEITA.parquet`: nomes de coluna únicos,
    números e datas convertidos, só a coluna "Resultado" de cada medida, sem a linha de total. Quando
    o BW grava a unidade junto do número ("6.481.782 KW"), ela é retirada; quando imprime "*" no
-   Resultado (unidades misturadas), o valor é a soma das colunas kW, kW.h e "Não atribuído";
+   Resultado (unidades misturadas), o valor é a soma das colunas kW, kW.h e "Não atribuído". As
+   colunas são localizadas pelo nome no cabeçalho, nunca pela posição: uma coluna nova ou retirada
+   pelo BW (como a data de faturamento, retirada em 2026) não quebra a leitura; se faltar uma coluna
+   obrigatória, o script para com erro;
 3. confere as cinco medidas contra a linha "Result.global" do csv: montante ao centavo e
    quantidades com tolerância de 1 parte em 10 mil (o BW arredonda as quantidades linha a linha);
 4. só se a conferência passar, compacta o csv em `src/csv_original/` (mesmo nome, `.zip`) e o apaga.
@@ -69,7 +71,7 @@ Tudo o que muda de um mês para outro está nesta célula. O restante do noteboo
 Os meses que já têm zip e parquet são pulados; `--forcar` refaz todos a partir dos zips.
 
 **Leitura no notebook.** O parquet traz, além das colunas da extração antiga, o lote de leitura
-(Conjunto de Contrato), a data de faturamento, a referência original e o indicador de refaturamento.
+(Conjunto de Contrato), a referência original e o indicador de refaturamento.
 Cada lançamento recebe um **tipo de faturamento**, que preenche a coluna `TipoFaturamento` do layout
 Receita Faturada:
 
@@ -83,7 +85,8 @@ Lançamentos sem o X com mês de referência antigo são faturamento normal (FAT
 BW numa operação própria ("R/Não atribuído"), sem identificação de TOI: os tributos do TOI ficam em
 FAT; os do refaturamento têm o X e ficam em REFAT.
 
-Lote, data de faturamento e referência original são somados. Cada linha da base no notebook é uma
+Lote e referência original são somados. Do lote fica, em cada linha, a quantidade ponderada pelo
+peso de cada vigência no ciclo de leitura (Passo 4). Cada linha da base no notebook é uma
 combinação de:
 
 - categoria tarifária (que contém o subgrupo e a modalidade);
@@ -230,13 +233,13 @@ próprias na tabela.
 O PCAT escreve o posto por extenso e o BW usa o código abreviado do SAP. Para casar os dois, a
 mesma regra do Passo 3 é aplicada sobre a tabela de tarifas.
 
-**Qual vigência vale no mês.** Cada vigência recebe um peso igual à fração de dias do mês que ela
-cobre, e a tarifa do mês é a média ponderada. Como a ponderação é linear, TA = BE + CVA + FIN
-continua exata. Nos meses de reajuste esse peso de calendário é apenas o ponto de partida; o
-Passo 7b o substitui por uma estimativa.
+**Qual vigência vale em cada linha.** A tarifa muda no reajuste anual (4 de julho em SP). Pela regra
+da ANEEL, quem tem o ciclo de leitura cruzando essa data paga parte pela tarifa antiga e parte pela
+nova, na proporção dos dias de cada vigência (REN 1.000/2021, art. 173, § 2º; README 3.6). O peso
+de cada vigência vem do ciclo de leitura do lote do cliente, e a tarifa da linha é a média
+ponderada. Como a ponderação é linear, TA = BE + CVA + FIN continua exata.
 
-**O calendário de leitura** (em implementação; substituirá o Passo 7b). O peso de cada vigência
-passa a vir do ciclo de leitura do lote do cliente, pela regra da ANEEL (README 3.6).
+**O calendário de leitura.**
 
 - **Fonte.** O calendário de leitura da área (`ESCALA AT MT BTr e BT`), salvo em
   `src/calendario_leitura_<ano>.xlsx`, uma aba por mês (`Jan` a `Dez`).
@@ -265,11 +268,28 @@ passa a vir do ciclo de leitura do lote do cliente, pela regra da ANEEL (README 
     ciclo é o mês civil da referência.
   - `SEM_FATURAMENTO` (`cashpower`): sem tarifa proporcional.
   - Lote do BW que não está na tabela: fica com a tarifa do mês, sem proporcionalidade, e é listado
-    na aba `Lotes sem calendário`. A tabela é mantida à mão, com uma linha por lote novo.
-- **Peso de cada vigência.** Dias do ciclo em cada vigência ÷ dias do ciclo. Só os ciclos que
-  contêm a data do reajuste misturam vigências; nos demais o cálculo fica como hoje.
-- **Refaturamento e faturamento manual** (REFAT e CNR) ficam com a tarifa do mês, sem
-  proporcionalidade.
+    na aba `Lotes_sem_calendario`. A tabela é mantida à mão, com uma linha por lote novo.
+  - Tabela com lote repetido, ou grupo sem nº de lote com mais de um ciclo no mês: o notebook para
+    com erro.
+- **Peso de cada vigência.** Dias do ciclo em cada vigência ÷ dias do ciclo.
+  - Só os ciclos que contêm o início de uma vigência misturam as duas; nos demais o peso é 100% de
+    uma vigência e o cálculo é o de sempre.
+  - O calendário só é lido quando uma vigência começa dentro do ciclo mais longo possível de uma
+    leitura do mês (62 dias antes do início do mês). Nesses meses, se o calendário do mês não
+    estiver na tabela, o notebook para com erro; nos demais, o calendário não é necessário.
+- **Tarifa do mês.** Dias do mês em cada vigência ÷ dias do mês. Vale para:
+  - refaturamento e faturamento manual (REFAT e CNR). O REFAT exigiria o calendário e a tarifa do
+    mês original, que pode ser de anos atrás, para um efeito pequeno; o CNR não tem ciclo de leitura;
+  - lotes sem faturamento (`cashpower`) e lotes fora do de-para;
+  - o SD (Parte II), que não tem lote.
+- **Da linha do BW à linha agregada.** A base é somada sem o lote (Passo 1). Para não perder o ciclo,
+  a soma guarda, para cada vigência, a quantidade multiplicada pelo peso dela. O peso da linha
+  agregada é essa soma dividida pela quantidade total: a média dos pesos ponderada pela quantidade,
+  exata porque o valor é linear no peso. Linhas sem quantidade, ou com quantidades de sinais opostos
+  que levem a média para fora de 0% a 100%, ficam com a tarifa do mês.
+- **Onde o peso é usado.** No bloco 1 (Passo 7), na tarifa da faixa 01 do Desconto Social (Passo 8)
+  e na diferença de tarifa livre − APE (Passo 9, peso médio do grupo). Se a chave não existe numa das
+  vigências, o peso é redistribuído entre as vigências em que ela existe.
 
 ## Passo 5 — A quantidade
 
@@ -319,56 +339,6 @@ Não é um desconto percentual: é a não incidência desses itens, como prevê 
 
 O valor calculado é a soma dos 37 itens. A tarifa total publicada vem arredondada em duas casas, por
 isso pode diferir alguns milhares de reais no mês de quem calcule pela tarifa total.
-
-## Passo 7b — Tarifa proporcional nos meses de reajuste
-
-> Este passo será substituído pela tarifa proporcional por lote, a partir do calendário de leitura
-> (Passo 4). O BW passou a trazer o lote de cada cliente, o que torna a estimativa pela receita
-> desnecessária.
-
-**O problema.** A tarifa muda no reajuste anual (4 de julho em SP). Pela regra da ANEEL, quem tem o
-ciclo de leitura cruzando essa data paga parte pela tarifa antiga e parte pela nova, na proporção
-dos dias de cada vigência (REN 1.000/2021, art. 173, § 2º; README 3.6).
-
-- O BW não traz o calendário de leitura de cada cliente.
-- O calendário do mês diz que, em julho, 90% dos dias já estão na tarifa nova.
-- Mas a alta tensão é lida no início do mês: a conta de julho é, na prática, consumo de junho.
-- Usar o calendário atribuiria tarifa nova a consumo faturado pela antiga. A diferença iria para o
-  fechamento e distorceria a abertura.
-
-**A ideia.** Usar a própria receita como termômetro.
-
-- **A régua.** Nos meses sem reajuste, a receita real de cada subgrupo difere da conta tarifa ×
-  quantidade por um fator estável. Esse fator é a régua do subgrupo.
-- **A pergunta.** No mês do reajuste: qual mistura de tarifa antiga e nova faz a conta bater com a
-  receita, descontada a régua?
-- **A resposta** é o peso da tarifa nova naquele subgrupo.
-
-**Como funciona.**
-
-1. **Histórico.** Todo mês processado grava `tbl/calibracao/calibracao_<ref>.csv`, com a receita e
-   o valor calculado por subgrupo e classe. Esses arquivos formam o histórico.
-2. **Régua.** No mês do reajuste e no seguinte, a régua é a média dos últimos `N_MESES_CALIBRACAO`
-   meses normais.
-3. **Base usada.** A estimativa usa só clientes cativos sem benefício social. Neles a receita é
-   tarifa × quantidade, sem desconto de rede nem isenção.
-4. **Cálculo do peso.** Com `A` = valor do subgrupo 100% na tarifa antiga e `B` = 100% na nova, o
-   peso da nova é `(receita / régua − A) / (B − A)`, limitado entre 0% e 100%.
-5. **Aplicação.** O peso vale para todas as linhas do subgrupo (cativo, livre, benefício social e
-   SD), e a tarifa e o bloco 1 são refeitos.
-6. **Salvaguardas.** O subgrupo fica com o peso do calendário quando:
-   - não há histórico;
-   - o reajuste do subgrupo é menor que 2%, porque a conta divide por `B − A` e fica instável;
-   - a receita cativa do subgrupo é menor que R$ 1 milhão no mês. Em subgrupos pequenos, `B − A`
-     vale poucos milhares de reais, e um refaturamento ou acerto pontual do mesmo tamanho muda o
-     peso estimado em dezenas de pontos percentuais. Como esses subgrupos pesam pouco no total, o
-     peso do calendário é suficiente.
-
-   Um peso informado em `DIAS_POR_SUBGRUPO` prevalece sobre o estimado.
-
-**Como conferir.** A estimativa é feita por subgrupo, então a conferência é feita por classe, que é
-uma visão independente dela. O resultado fica nas abas `Calibracao_subgrupo` e `Calibracao_classe`
-da saída.
 
 ## Passo 8 — Agrupar e estimar as faixas dos benefícios sociais
 
@@ -574,7 +544,7 @@ A saída `1-Entrega/pxq/pxq_<ref>.xlsx` traz:
 | `Componentes_BE` | Os mesmos itens na base econômica (é o que alimenta o layout final). No fim, os totais por camada dos dois blocos: `[2] Total TA/BE/CVA/FIN` e `[1] Total TA/BE/CVA/FIN` (estes usados pelo check tarifa homologada × tarifa realizada) |
 | `Familias` | As sete famílias, nas quatro camadas, blocos 1 e 2 |
 | `Nao_tarifaveis_linha` | Cada lançamento não tarifável do BW, linha a linha, com classe, mercado e tipo de faturamento |
-| `Calibracao_subgrupo`, `Calibracao_classe` | Só nos meses de reajuste: o peso estimado de cada vigência e a conferência por classe (Passo 7b) |
+| `Lotes_sem_calendario` | Lotes do BW com faturamento normal (FAT) fora do de-para do calendário de leitura: ficam com a tarifa do mês (Passo 4) |
 | `Diferencas_linha`, `Diferencas_grupo` | Só com `APLICAR_2A_PASSADA` desligado |
 
 Todas as abas trazem a coluna `Tipo de faturamento` (FAT, REFAT ou CNR; o SD é sempre FAT). Nas abas
@@ -631,6 +601,9 @@ tarifa realizada use exatamente a mesma regra com o bloco 1.
 - **Geração na linha de energia.** O modelo só tem a linha D para geração. O valor da energia vai
   para Outros da linha GERAÇÃO / D, e o MWh, que não pode ser somado ao MW, aparece em nota na aba
   `Conferencia`.
+- **Aba `Lotes sem calendário`.** Cópia da aba `Lotes_sem_calendario` do pxq: lotes do BW com
+  faturamento normal fora do de-para do calendário de leitura, que ficaram com a tarifa do mês
+  (Passo 4).
 - **Aba `Conferencia`.** Concilia: receita total do pxq = valor gravado no layout + o que ficou fora.
   Com as regras acima nada fica fora, e a diferença tem de ser zero. A aba traz também o total
   gravado por tipo de faturamento. O total gravado é a receita

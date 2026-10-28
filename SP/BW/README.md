@@ -78,8 +78,7 @@ SP/BW/
 │   ├── tarifas/tarifa_long.csv   tarifas homologadas, todas as vigências e camadas
 │   ├── modelo/De-Para_Modelo_PyC.xlsx  modelo da área para o layout Receita Faturada
 │   ├── calendario/calendario_leitura.csv  data de leitura e ciclo de cada lote, por mês
-│   ├── calendario/de_para_lote.csv  lote do BW -> lote do calendário de leitura
-│   └── calibracao/               histórico mensal usado na tarifa proporcional
+│   └── calendario/de_para_lote.csv  lote do BW -> lote do calendário de leitura
 └── src/                          arquivos de origem (não editados pelo processo)
     ├── csv_original/             extração mensal do BW, csv compactado (MM-AAAA_ENEL SP_RECEITA.zip)
     └── parquet/                  a mesma extração em parquet limpo, lida pelo notebook
@@ -88,8 +87,8 @@ SP/BW/
 | Pasta / arquivo | Para que serve |
 |---|---|
 | [`1-Entrega/Abertura_PxQ.ipynb`](1-Entrega/Abertura_PxQ.ipynb) | O processo completo. Lê o BW e a planilha de geradoras, suprimentos e uso da distribuição (SD), valoriza pela tarifa homologada, aplica os descontos regulatórios e o ajuste de fechamento (2ª passada) e grava `pxq_<ref>.xlsx`. |
-| `1-Entrega/pxq/pxq_<ref>.xlsx` | Resultado mensal. A aba `Leia-me` descreve cada aba e os scripts que a usam. A aba `Componentes` traz a tarifa de aplicação e `Componentes_BE` a base econômica, ambas abertas nos 37 itens. `Familias` agrupa os itens nas sete famílias. `Nao_tarifaveis_linha` traz os lançamentos que não entram no cálculo, um a um. Nos meses de reajuste há também as abas de calibração da tarifa proporcional. |
-| `1-Entrega/receita_faturada/receita_faturada_<ref>.xlsx` | O pxq convertido no layout Receita Faturada, com a aba `Conferencia`, que concilia o total com a receita do BW. |
+| `1-Entrega/pxq/pxq_<ref>.xlsx` | Resultado mensal. A aba `Leia-me` descreve cada aba e os scripts que a usam. A aba `Componentes` traz a tarifa de aplicação e `Componentes_BE` a base econômica, ambas abertas nos 37 itens. `Familias` agrupa os itens nas sete famílias. `Nao_tarifaveis_linha` traz os lançamentos que não entram no cálculo, um a um. `Lotes_sem_calendario` lista os lotes do BW com faturamento normal que não estão no de-para do calendário de leitura. |
+| `1-Entrega/receita_faturada/receita_faturada_<ref>.xlsx` | O pxq convertido no layout Receita Faturada, com a aba `Conferencia`, que concilia o total com a receita do BW, e a aba `Lotes sem calendário`. |
 | [`1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md`](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md) | Cada transformação do notebook e dos scripts, e o motivo dela. |
 | `2-Checks/resultados/` | Conferências mensais contra o Mercado Receita e a conferência contra o informe de gestão. |
 | `2-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês (seção 5.4). |
@@ -100,7 +99,7 @@ SP/BW/
 | [`3-Py/1-Entrega/gera_calendario_leitura.py`](3-Py/1-Entrega/gera_calendario_leitura.py) | Lê o calendário de leitura (`src/calendario_leitura_<ano>.xlsx`, uma aba por mês) e grava `tbl/calendario/calendario_leitura.csv`: `python 3-Py/1-Entrega/gera_calendario_leitura.py 2026`. Carrega só as abas presentes e substitui apenas esses meses na tabela. |
 | [`3-Py/1-Entrega/gera_receita_faturada.py`](3-Py/1-Entrega/gera_receita_faturada.py) | Converte o pxq no layout Receita Faturada: `python 3-Py/1-Entrega/gera_receita_faturada.py 2026-06` ou `--todos`. |
 | [`3-Py/2-Checks/`](3-Py/2-Checks/) | `check_mr_bloco2.py` compara o mês por opção de compra e subgrupo. `check_mr_camadas.py` compara por família e camada, mês a mês. `consolida_check_mr_bloco2.py` consolida vários meses. `le_mr.py` lê o Mercado Receita (também usado pelos checks do SAMP). `gera_receita_faturada_mr.py` monta o Mercado Receita no layout Receita Faturada e gera o check célula a célula: `python 3-Py/2-Checks/gera_receita_faturada_mr.py 2026-05` ou `--todos`. `gera_receita_faturada_bl1_vs_bl2.py` compara a tarifa homologada com a realizada e separa os descontos: `python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py --todos`. |
-| `tbl/` | Tabelas do processo: tarifas homologadas, calendário de leitura, o histórico de calibração da tarifa proporcional e o modelo do layout Receita Faturada. |
+| `tbl/` | Tabelas do processo: tarifas homologadas, calendário de leitura e o modelo do layout Receita Faturada. |
 | `tbl/calendario/` | `calendario_leitura.csv`: uma linha por mês, grupo e lote, com a data de leitura, os dias de consumo e o início e fim do ciclo. `de_para_lote.csv`: o grupo e o nº do lote do calendário para cada lote do BW (campo `Conjunto de Contrato`), validado pela área do BW. Ambos em csv para facilitar a passagem para a TI. |
 | `tbl/modelo/De-Para_Modelo_PyC.xlsx` | Modelo da área para o layout Receita Faturada: a aba "Receita Faturada" define as colunas e a grade de linhas; a aba "Instruções", o de-para dos itens tarifários para os grupos do layout. Sem ele a Receita Faturada não é gerada. Não tem dados da Enel e é versionado no Git. |
 | `src/` | Fontes externas: a extração de receita do BW, a planilha do SD, os PCATs (`src/pcats/`), o calendário de leitura (`calendario_leitura_<ano>.xlsx`) e o Mercado Receita do período tarifário. |
@@ -248,14 +247,12 @@ em que `Ti` é a tarifa em vigor no período `i`, `Pi` o número de dias em que 
 número de dias de fornecimento entre duas leituras consecutivas. Em SP, o reajuste anual ocorre em
 4 de julho.
 
-**Impacto no cálculo:** no mês do reajuste e no seguinte, cada subgrupo tarifário mistura a tarifa
-antiga e a nova. Até aqui, o peso de cada vigência é estimado pela receita (Passo 7b do
-procedimento).
-
-**Em implementação:** o peso passa a vir do ciclo de leitura de cada lote. O BW traz o lote do
-cliente (`Conjunto de Contrato`); o calendário de leitura dá a data de leitura e os dias de consumo
-de cada lote (`tbl/calendario/`). Só os ciclos que contêm a data do reajuste recebem tarifa
-proporcional; nos demais meses o cálculo não muda. Refaturamento (REFAT) e faturamento manual (CNR)
+**Impacto no cálculo:** o peso de cada vigência vem do ciclo de leitura do lote. O BW traz o lote
+do cliente (`Conjunto de Contrato`); o calendário de leitura dá a data de leitura e os dias de
+consumo de cada lote (`tbl/calendario/`). Só os ciclos que contêm a data do reajuste misturam as duas
+vigências; nos demais meses o cálculo não muda. Em 2026, isso afeta as leituras de julho e agosto: a
+Média Tensão, lida no dia 1º, fatura julho inteiro pela tarifa antiga; a Baixa Tensão de julho tem
+de 1 a 29 dias na tarifa antiga, conforme o lote. Refaturamento (REFAT) e faturamento manual (CNR)
 ficam com a tarifa do mês: o REFAT exigiria o calendário e a tarifa do mês original, que pode ser de
 anos atrás, para um efeito pequeno; o CNR não tem ciclo de leitura.
 
@@ -308,8 +305,9 @@ O notebook percorre as etapas abaixo. O porquê de cada uma está no
 - **Valorização.** Quantidade × tarifa, nos 37 itens e nas quatro camadas.
 - **Benefícios sociais** (3.5). Os itens isentos são zerados. A participação de cada faixa de
   consumo é estimada pela receita de cada grupo.
-- **Tarifa proporcional** (3.6). Nos meses de reajuste, o peso da tarifa nova é estimado por
-  subgrupo pela receita dos clientes cativos sem benefício. Os meses normais servem de régua.
+- **Tarifa proporcional** (3.6). Cada lançamento usa o ciclo de leitura do seu lote: o peso de cada
+  vigência é a fração dos dias do ciclo que ela cobre. REFAT, CNR, o SD e os lotes fora do de-para
+  ficam com a tarifa do mês.
 
 **Bloco 2: aplicação dos descontos e ajuste de fechamento**
 
@@ -350,65 +348,72 @@ O ponto de partida é a pergunta: quanto da receita faturada a tarifa homologada
 que explica o restante? A resposta é uma conta de chegada, que fecha exatamente todo mês:
 
 ```
-(a) receita faturada = (b) bloco 1 + (d) isenção APE + (e) fonte incentivada + (f) 2ª passada + (g) resíduo
+(a) receita faturada = (b) bloco 1 + (d) Tarifa Social + (e) isenção APE + (f) fonte incentivada
+                       + (g) 2ª passada + (h) resíduo
 ```
 
 **O que é cada linha**
 
 - **(a) Receita faturada (base tarifável).** Receita registrada no BW e no SD para os lançamentos
   que têm tarifa homologada (seção 3.8). É o valor que a abertura precisa reproduzir.
-- **(b) Bloco 1.** Quantidade faturada × tarifa homologada cheia, já com a isenção de encargos e as
-  faixas dos benefícios sociais (3.5) e a tarifa proporcional nos meses de reajuste (3.6). É o que
-  a tarifa explica sozinha.
+- **(b) Bloco 1.** Quantidade faturada × tarifa homologada cheia, com a isenção de encargos dos
+  benefícios sociais, as faixas do Desconto Social e a Tarifa Social pela tarifa da subclasse Baixa
+  Renda sem a redução (3.5), e a tarifa proporcional pelo ciclo de leitura do lote (3.6). É o que a
+  tarifa explica sozinha.
 - **(c) Diferença a explicar.** Quanto o bloco 1 fica acima da receita, (b) − (a). Existe porque
   a tabela de tarifas traz a tarifa cheia e parte dos clientes paga com desconto.
-- **(d) Isenção APE.** Redução dos encargos da TUSD de energia dos autoprodutores por equiparação,
+- **(d) Tarifa Social.** A faixa gratuita até 80 kWh, estimada pela receita (3.5).
+- **(e) Isenção APE.** Redução dos encargos da TUSD de energia dos autoprodutores por equiparação,
   registrada no BW em linhas próprias (3.4).
-- **(e) Fonte incentivada (1ª passada).** Desconto na TUSD dos clientes livres do grupo A que compram
+- **(f) Fonte incentivada (1ª passada).** Desconto na TUSD dos clientes livres do grupo A que compram
   energia incentivada, aplicado só sobre Fio A e Fio B (3.3).
-- **(f) 2ª passada, líquida.** O que sobra depois dos descontos regulatórios, distribuído por igual
+- **(g) 2ª passada, líquida.** O que sobra depois dos descontos regulatórios, distribuído por igual
   entre os itens de cada grupo para fechar na receita: arredondamentos, refaturamentos e acertos de
   faturamento. Não é desconto; é o único ajuste do processo e o principal indicador de qualidade do
   processo.
-- **(g) Resíduo sem item tarifário.** Receita de grupos cujo bloco 1 é zero: sem item tarifário para
+- **(h) Resíduo sem item tarifário.** Receita de grupos cujo bloco 1 é zero: sem item tarifário para
   escalar, ela fica fora da abertura e é informada à parte.
-- **(h) 2ª passada, bruta.** Soma dos valores absolutos da 2ª passada de todos os grupos. Mostra se
+- **(i) 2ª passada, bruta.** Soma dos valores absolutos da 2ª passada de todos os grupos. Mostra se
   o resultado líquido pequeno esconde ajustes grandes de sinais opostos.
 
 **Valores absolutos**
 
 | Item | Unidade | jan | fev | mar | abr | mai | jun | jul | ago |
 |---|---|---|---|---|---|---|---|---|---|
-| (a) Receita faturada (base tarifável) | R$ milhões | 1.937,5 | 1.835,7 | 1.798,1 | 1.943,8 | 1.848,7 | 1.706,7 | 1.812,8 | 1.938,3 |
-| (b) Bloco 1 (tarifa cheia) | R$ milhões | 2.010,1 | 1.914,5 | 1.875,3 | 2.017,6 | 1.923,6 | 1.781,3 | 1.899,3 | 2.027,7 |
-| (c) Diferença a explicar, (b) − (a) | R$ milhões | 72,6 | 78,7 | 77,2 | 73,8 | 74,9 | 74,6 | 86,5 | 89,4 |
-| (d) Isenção APE | R$ milhões | −9,9 | −16,1 | −14,7 | −9,2 | −11,0 | −13,0 | −13,1 | −16,1 |
-| (e) Fonte incentivada (1ª passada) | R$ milhões | −63,0 | −63,2 | −64,1 | −66,3 | −63,0 | −62,9 | −68,4 | −72,9 |
-| (f) 2ª passada, líquida | R$ milhões | 0,3 | 0,6 | 1,5 | 1,6 | −0,8 | 1,3 | −5,1 | −0,4 |
-| (g) Resíduo sem item tarifário | R$ milhões | 0,0 | 0,0 | 0,1 | 0,1 | 0,0 | 0,0 | 0,1 | 0,0 |
-| (h) 2ª passada, bruta | R$ milhões | 3,6 | 3,7 | 3,0 | 3,5 | 4,5 | 2,8 | 9,0 | 8,9 |
+| (a) Receita faturada (base tarifável) | R$ milhões | 1.940,7 | 1.835,7 | 1.798,1 | 1.943,9 | 1.848,7 | 1.706,7 | 1.812,8 | 1.938,6 |
+| (b) Bloco 1 (tarifa cheia) | R$ milhões | 2.052,0 | 1.951,6 | 1.911,3 | 2.053,8 | 1.959,3 | 1.816,1 | 1.932,5 | 2.075,2 |
+| (c) Diferença a explicar, (b) − (a) | R$ milhões | 111,3 | 115,9 | 113,2 | 109,9 | 110,6 | 109,4 | 119,7 | 136,6 |
+| (d) Tarifa Social (faixa gratuita) | R$ milhões | −38,8 | −37,1 | −36,0 | −36,1 | −35,7 | −34,8 | −40,6 | −45,5 |
+| (e) Isenção APE | R$ milhões | −9,9 | −16,1 | −14,7 | −9,2 | −11,0 | −13,0 | −13,1 | −16,1 |
+| (f) Fonte incentivada (1ª passada) | R$ milhões | −63,0 | −63,5 | −64,1 | −66,3 | −63,0 | −62,9 | −63,8 | −72,8 |
+| (g) 2ª passada, líquida | R$ milhões | 0,3 | 0,9 | 1,5 | 1,6 | −0,8 | 1,3 | −2,3 | −2,3 |
+| (h) Resíduo sem item tarifário | R$ milhões | 0,0 | 0,0 | 0,1 | 0,1 | 0,0 | 0,0 | 0,1 | 0,0 |
+| (i) 2ª passada, bruta | R$ milhões | 3,7 | 7,9 | 3,4 | 4,0 | 4,6 | 3,0 | 5,7 | 7,9 |
 
 **Em relação à receita faturada**
 
 | Item | Unidade | jan | fev | mar | abr | mai | jun | jul | ago |
 |---|---|---|---|---|---|---|---|---|---|
-| (c) Diferença a explicar | % de (a) | 3,74 | 4,29 | 4,29 | 3,80 | 4,05 | 4,37 | 4,77 | 4,61 |
-| (d) Isenção APE | % de (a) | −0,51 | −0,88 | −0,82 | −0,47 | −0,60 | −0,76 | −0,72 | −0,83 |
-| (e) Fonte incentivada (1ª passada) | % de (a) | −3,25 | −3,44 | −3,56 | −3,41 | −3,41 | −3,69 | −3,77 | −3,76 |
-| (f) 2ª passada, líquida | % de (a) | +0,02 | +0,03 | +0,08 | +0,08 | −0,04 | +0,07 | −0,28 | −0,02 |
-| (g) Resíduo sem item tarifário | % de (a) | 0,00 | 0,00 | 0,00 | 0,01 | 0,00 | 0,00 | 0,00 | 0,00 |
-| (h) 2ª passada, bruta | % de (a) | 0,19 | 0,20 | 0,17 | 0,18 | 0,25 | 0,16 | 0,50 | 0,46 |
+| (c) Diferença a explicar | % de (a) | 5,74 | 6,31 | 6,30 | 5,66 | 5,98 | 6,41 | 6,60 | 7,05 |
+| (d) Tarifa Social | % de (a) | −2,00 | −2,02 | −2,00 | −1,86 | −1,93 | −2,04 | −2,24 | −2,35 |
+| (e) Isenção APE | % de (a) | −0,51 | −0,88 | −0,82 | −0,47 | −0,60 | −0,76 | −0,72 | −0,83 |
+| (f) Fonte incentivada (1ª passada) | % de (a) | −3,25 | −3,46 | −3,56 | −3,41 | −3,41 | −3,69 | −3,52 | −3,76 |
+| (g) 2ª passada, líquida | % de (a) | +0,02 | +0,05 | +0,08 | +0,08 | −0,04 | +0,07 | −0,13 | −0,12 |
+| (h) Resíduo sem item tarifário | % de (a) | 0,00 | 0,00 | 0,00 | 0,01 | 0,00 | 0,00 | 0,00 | 0,00 |
+| (i) 2ª passada, bruta | % de (a) | 0,19 | 0,43 | 0,19 | 0,21 | 0,25 | 0,18 | 0,32 | 0,41 |
 
 **Leitura**
 
-- A tarifa cheia fica entre 3,7% e 4,8% acima do faturado. Os dois descontos regulatórios
+- A tarifa cheia fica entre 5,7% e 7,1% acima do faturado. Os três descontos regulatórios
   explicam quase toda essa diferença: a fonte incentivada responde por cerca de 3,5 pontos
-  percentuais e a isenção APE por 0,5 a 0,9 ponto.
+  percentuais, a Tarifa Social por cerca de 2 pontos e a isenção APE por 0,5 a 0,9 ponto.
 - Nos meses sem reajuste, a 2ª passada líquida fica abaixo de 0,1% da receita e a bruta abaixo
-  de 0,3%.
-- Julho e agosto são meses de reajuste, e neles a 2ª passada bruta chega a 0,5%, mesmo com a
-  tarifa proporcional estimada. Sem a estimativa, a conta da base cativa de julho ficaria 4,8%
-  acima do faturado; com ela, a diferença cai para 0,01%.
+  de 0,5%.
+- Julho e agosto são os meses com tarifa proporcional, calculada pelo ciclo de leitura de cada lote
+  (3.6). A 2ª passada bruta fica em 0,32% e 0,41%. Com o método anterior, que estimava o peso de
+  cada vigência pela receita, ela era de 0,52% e 0,51%.
+- Em agosto, cerca de R$ 2,3 milhões da 2ª passada vêm de lançamentos de B3 cativo faturados só com
+  TE, sem a TUSD, nos lotes centro_02_bt e abc_02_bt (pendência P25 em [`sessions.md`](sessions.md)).
 
 ### 5.2 Validações
 
@@ -511,9 +516,9 @@ Total do layout, colunas I a AE (R$ milhões):
 
 | | jan | fev | mar | abr | mai | jun | jul | ago |
 |---|---|---|---|---|---|---|---|---|
-| PxQ | 2.515,8 | 2.366,1 | 2.297,3 | 2.483,2 | 2.414,4 | 2.213,7 | 2.362,5 | 2.529,1 |
+| PxQ | 2.519,2 | 2.366,3 | 2.297,5 | 2.483,5 | 2.414,6 | 2.214,0 | 2.362,7 | 2.529,7 |
 | MR | 2.475,3 | 2.359,6 | 2.286,7 | 2.467,3 | 2.377,6 | 2.377,6 | 2.473,9 | 2.525,5 |
-| PxQ − MR | 40,5 | 6,5 | 10,6 | 15,9 | 36,8 | −163,9 | −111,4 | 3,6 |
+| PxQ − MR | 43,9 | 6,7 | 10,9 | 16,1 | 37,0 | −163,6 | −111,2 | 4,1 |
 
 Leitura:
 
@@ -557,14 +562,14 @@ Diferença tarifa homologada − tarifa realizada (R$ milhões; positivo = desco
 | | jan | fev | mar | abr | mai | jun | jul | ago |
 |---|---|---|---|---|---|---|---|---|
 | Tarifa Social – DMR | 37,3 | 34,5 | 33,3 | 32,7 | 32,9 | 31,9 | 37,5 | 42,7 |
-| SCEE - Baixa Renda(\*) | 1,5 | 2,6 | 2,7 | 3,5 | 2,7 | 2,8 | 2,8 | 2,8 |
+| SCEE - Baixa Renda(\*) | 1,5 | 2,6 | 2,7 | 3,4 | 2,7 | 2,8 | 3,1 | 2,8 |
 | APE | 9,9 | 16,1 | 14,7 | 9,2 | 11,0 | 13,0 | 13,1 | 16,1 |
-| Fonte incentivada | 63,0 | 63,5 | 64,1 | 66,3 | 63,0 | 62,9 | 68,4 | 72,9 |
-| 2ª passada | −0,3 | −0,9 | −1,5 | −1,6 | 0,8 | −1,3 | 5,1 | 0,4 |
-| **Total** | **111,4** | **115,9** | **113,3** | **110,1** | **110,6** | **109,4** | **126,8** | **134,9** |
+| Fonte incentivada | 63,0 | 63,5 | 64,1 | 66,3 | 63,0 | 62,9 | 63,8 | 72,8 |
+| 2ª passada | −0,3 | −0,9 | −1,5 | −1,6 | 0,8 | −1,3 | 2,3 | 2,2 |
+| **Total** | **111,4** | **115,9** | **113,3** | **110,1** | **110,6** | **109,4** | **119,8** | **136,7** |
 
-O total sem a Tarifa Social é a linha (c) da seção 5.1; APE, fonte incentivada e 2ª passada são as
-linhas (d), (e) e (f) com o sinal invertido.
+O total é a linha (c) da seção 5.1, a menos do resíduo; Tarifa Social – DMR mais SCEE - Baixa
+Renda(\*), APE, fonte incentivada e 2ª passada são as linhas (d), (e), (f) e (g) com o sinal invertido.
 
 Leitura:
 
@@ -572,15 +577,15 @@ Leitura:
   Básica R$ 24,2 milhões, Conexão T R$ 1,1 milhão e CUSD R$ 0,2 milhão.
 - **APE.** Cai só nos encargos: em maio, CDE USO R$ 8,8 milhões e PROINFA R$ 1,6 milhão.
 - **Tarifa Social.** A linha DMR é o subsídio homologado: R$ 282,9 milhões de janeiro a agosto.
-- **SCEE - Baixa Renda(\*).** Não é subsídio homologado com a DMR: R$ 21,4 milhões no período, estável em
+- **SCEE - Baixa Renda(\*).** Não é subsídio homologado com a DMR: R$ 21,7 milhões no período, estável em
   cerca de R$ 2,7 milhões por mês. Nos clientes Baixa Renda com geração distribuída, a energia
   compensada é faturada pela TE do SCEE, sem o componente de energia (R$ 37,19 contra R$ 316,78/MWh;
   REN 1.000/2021, art. 655-I), e o benefício da Tarifa Social também incide sobre ela (art. 655-G, §8º).
   O BW não identifica essa energia, que é valorizada pela TE comum. Energia e receita da Baixa Renda no
   BW batem com o informe de gestão; a diferença está só na tarifa.
-- **Tarifa Social + SCEE - Baixa Renda(\*)** (R$ 304,2 milhões, a faixa gratuita calculada) cai em todos
+- **Tarifa Social + SCEE - Baixa Renda(\*)** (R$ 304,6 milhões, a faixa gratuita calculada) cai em todos
   os itens:
-  Compra de Energia R$ 127,9 milhões, Parcela B R$ 112,4 milhões, Perdas R$ 23,8 milhões, Rede Básica
+  Compra de Energia R$ 128,0 milhões, Parcela B R$ 112,5 milhões, Perdas R$ 23,8 milhões, Rede Básica
   R$ 23,2 milhões no período.
 - **Fora do check.** Desconto Social, isenção de encargos da Baixa Renda e as tarifas próprias das
   subclasses ficam no bloco 1 e não aparecem na diferença: não são reembolsados pela CDE.

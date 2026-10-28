@@ -334,6 +334,30 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     ws_c.column_dimensions["B"].width = 48
     ws_c.column_dimensions["C"].width = 18
 
+    # ------------------------------------------------ BW lots outside the reading calendar de-para
+    # (copied from the pxq: FAT lines of these lots used the month tariff, without proration)
+    ws_l = wb.create_sheet("Lotes sem calendário")
+    try:
+        lotes = pd.read_excel(arq, "Lotes_sem_calendario")
+    except ValueError:                       # pxq generated before the reading calendar
+        lotes = None
+    if lotes is None:
+        ws_l.append(["Aba Lotes_sem_calendario ausente no pxq (gerado antes do calendário de leitura)."])
+    elif lotes.empty:
+        ws_l.append(["Nenhum lote do BW fora do de-para do calendário de leitura (tbl/calendario/de_para_lote.csv)."])
+    else:
+        ws_l.append(list(lotes.columns))
+        for r in lotes.itertuples(index=False):
+            ws_l.append(list(r))
+        for cel in ws_l["C"][1:]:
+            cel.number_format = "#,##0.00"
+        ws_l.append([])
+        ws_l.append(["Lotes com faturamento normal (FAT) fora do de-para do calendário de leitura: ficam com a "
+                     "tarifa do mês, sem tarifa proporcional. Incluir o lote em tbl/calendario/de_para_lote.csv."])
+    ws_l.column_dimensions["A"].width = 40
+    ws_l.column_dimensions["B"].width = 20
+    ws_l.column_dimensions["C"].width = 18
+
     DIR_SAIDA.mkdir(parents=True, exist_ok=True)
     saida = DIR_SAIDA / f"receita_faturada_{ref}.xlsx"
     wb.save(saida)

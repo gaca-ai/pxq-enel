@@ -12,7 +12,9 @@ Pastas:
 Para cada mes pendente (csv novo, ou zip sem parquet):
     1. le o csv (separador ";", UTF-8, 4 linhas de cabecalho, numeros no formato brasileiro);
     2. grava o parquet limpo: nomes de coluna unicos, numeros e datas convertidos, so a coluna
-       "Resultado" de cada medida, sem a linha de total;
+       "Resultado" de cada medida, sem a linha de total. As colunas sao localizadas pelo NOME no
+       cabecalho, nunca pela posicao: coluna nova ou retirada pelo BW (ex.: a data de faturamento,
+       retirada em 2026) nao quebra a leitura; falta de coluna obrigatoria para com erro;
     3. confere as cinco medidas do parquet contra a linha "Result.global" do csv (montante ao
        centavo; quantidades com tolerancia de 1 parte em 10 mil, pelo arredondamento do BW). Quando o BW
        imprime "*" no Resultado (unidades misturadas), o valor e a soma das colunas kW, kW.h e
@@ -20,6 +22,8 @@ Para cada mes pendente (csv novo, ou zip sem parquet):
     4. so se a conferencia passar: compacta o csv em src/csv_original/<mesmo nome>.zip e apaga o csv.
        Se a conferencia falhar, o csv fica onde esta e o parquet nao e gravado.
 """
+import csv
+import io
 import sys
 import zipfile
 from pathlib import Path
@@ -37,35 +41,25 @@ DIR_PARQUET = BASE / "src" / "parquet"
 LINHAS_CABECALHO = 4                        # 3 header rows of the BW export + the column names row
 TAMANHO_BLOCO = 200_000                     # rows per chunk (the csv has 200+ MB)
 
-# column position in the csv -> clean name (dimensions, as text)
-DIMENSOES = {
-    0: "Classe principal",
-    1: "Categoria tarifa",
-    2: "Grp.estatísts.mont.",
-    3: "Grp.estatísts.quant.",
-    4: "Grp.estatísts.quant. TEXTO",
-    5: "Operação principal",
-    6: "Operação principal TEXTO",
-    7: "Suboperação",
-    8: "Suboperação TEXTO",
-    9: "Flag Cli.Liv./ Cat.",
-    10: "Classe/Sub-classe",
-    11: "Conjunto de Contrato",
-    12: "Mês de Referência",
-    13: "Flag de Refaturamento",
-    14: "Data de Faturamento",
+# Dimensions kept in the parquet, by their clean name. A text column repeats the name of its code
+# column in the csv header; the second occurrence gets the " TEXTO" suffix. Any other dimension
+# column of the export (e.g. "Data de Faturamento") is ignored.
+DIMENSOES = [
+    "Classe principal", "Categoria tarifa", "Grp.estatísts.mont.", "Grp.estatísts.quant.",
+    "Grp.estatísts.quant. TEXTO", "Operação principal", "Operação principal TEXTO", "Suboperação",
+    "Suboperação TEXTO", "Flag Cli.Liv./ Cat.", "Classe/Sub-classe", "Conjunto de Contrato",
+    "Mês de Referência", "Flag de Refaturamento",
+]
+APELIDOS = {"Flag de Refaturament": "Flag de Refaturamento"}   # names truncated by the BW export
+# Measure label in the "Índices" header row -> clean name. Only its "Resultado" column is kept;
+# the three columns before it (kW, kW.h, Não atribuído) are its breakdown.
+MEDIDAS_BW = {
+    "TUSD Faturado / KWH":       "TUSD Faturado (kWh)",
+    "TUSD Faturado / KW":        "TUSD Faturado (kW)",
+    "Demanda Faturado / KW":     "Demanda Faturada (kW)",
+    "Consumo TE Faturado / MWH": "Consumo TE Faturado (kWh)",
+    "Montante R$":               "Montante (R$)",
 }
-# "Resultado" column of each measure (the kW / kW.h / Não atribuído columns are its breakdown)
-MEDIDAS = {
-    18: "TUSD Faturado (kWh)",
-    22: "TUSD Faturado (kW)",
-    26: "Demanda Faturada (kW)",
-    30: "Consumo TE Faturado (kWh)",
-    34: "Montante (R$)",
-}
-# each "Resultado" is the sum of the three columns before it (kW, kW.h, Não atribuído); the BW prints
-# "*" in "Resultado" when the units are mixed, and then the value is rebuilt from those columns
-DETALHE = {c: [c - 3, c - 2, c - 1] for c in MEDIDAS}
 TOTAL = "Result.global"
 
 
@@ -83,54 +77,99 @@ def nao_numericos(s):
     return int(((t != "") & (pd.to_numeric(limpo.str.replace(",", ".", regex=False), errors="coerce").isna())).sum())
 
 
-def limpa(bloco):
+def abre(origem):
+    """Binary handle of the csv (or of the csv inside a zip) and the zip to close afterwards."""
+    if origem.suffix.lower() == ".zip":
+        z = zipfile.ZipFile(origem)
+        return z.open(z.namelist()[0]), z
+    return open(origem, "rb"), None
+
+
+def le_layout(origem):
+    """Locate the columns by name in the header rows. Returns (dimensions {position: clean name},
+    measures {position of "Resultado": clean name}, breakdown {position: [3 positions]})."""
+    arquivo, z = abre(origem)
+    try:
+        texto = io.TextIOWrapper(arquivo, encoding="utf-8")
+        cab = [next(csv.reader([texto.readline()], delimiter=";")) for _ in range(LINHAS_CABECALHO)]
+    finally:
+        arquivo.close()
+        if z is not None:
+            z.close()
+    indices, unidades, nomes = cab[1], cab[2], cab[3]
+    primeira = min((j for j, v in enumerate(indices) if v.strip() in MEDIDAS_BW), default=None)
+    if primeira is None:
+        raise ValueError(f"{origem.name}: no measure found in the header ({sorted(MEDIDAS_BW)})")
+
+    dimensoes, vistos = {}, set()
+    for j, nome in enumerate(nomes[:primeira]):
+        nome = APELIDOS.get(nome.strip(), nome.strip())
+        if not nome:
+            continue
+        limpo = f"{nome} TEXTO" if nome in vistos else nome
+        vistos.add(nome)
+        if limpo in DIMENSOES:
+            dimensoes[j] = limpo
+    faltam = [d for d in DIMENSOES if d not in dimensoes.values()]
+    if faltam:
+        raise ValueError(f"{origem.name}: dimension columns missing in the header: {faltam}")
+
+    medidas, detalhe = {}, {}
+    for j in range(primeira, len(indices)):
+        rotulo = indices[j].strip()
+        if rotulo in MEDIDAS_BW and unidades[j].strip() == "Resultado":
+            if [indices[k].strip() for k in (j - 3, j - 2, j - 1)] != [rotulo] * 3:
+                raise ValueError(f"{origem.name}: unexpected breakdown columns for {rotulo}")
+            medidas[j], detalhe[j] = MEDIDAS_BW[rotulo], [j - 3, j - 2, j - 1]
+    faltam = [m for m in MEDIDAS_BW.values() if m not in medidas.values()]
+    if faltam:
+        raise ValueError(f"{origem.name}: measure columns missing in the header: {faltam}")
+    return dimensoes, medidas, detalhe
+
+
+def limpa(bloco, dimensoes, medidas, detalhe):
     """Raw chunk (text) -> clean frame, plus the total row when present in the chunk."""
-    for col, nome in MEDIDAS.items():
+    for col, nome in medidas.items():
         estrela = bloco[col].fillna("").astype(str).str.strip() == "*"
         valor = numero_br(bloco[col])
         if estrela.any():
-            valor = valor.where(~estrela, sum(numero_br(bloco[d]) for d in DETALHE[col]))
+            valor = valor.where(~estrela, sum(numero_br(bloco[d]) for d in detalhe[col]))
         bloco[col] = np.where(estrela, valor.astype(str), bloco[col].fillna("").astype(str))
         bloco[f"__{nome}"] = valor
-    bloco = bloco.drop(columns=[d for ds in DETALHE.values() for d in ds])
-    bloco = bloco.rename(columns={**DIMENSOES, **MEDIDAS})
-    invalidos = sum(nao_numericos(bloco[c]) for c in MEDIDAS.values())
-    for c in MEDIDAS.values():
+    bloco = bloco.drop(columns=[d for ds in detalhe.values() for d in ds])
+    bloco = bloco.rename(columns={**dimensoes, **medidas})
+    invalidos = sum(nao_numericos(bloco[c]) for c in medidas.values())
+    for c in medidas.values():
         bloco[c] = bloco.pop(f"__{c}")
     eh_total = bloco["Classe principal"] == TOTAL
     total = bloco[eh_total]
     bloco = bloco[~eh_total].copy()
     bloco["Mês de Referência"] = pd.to_datetime(bloco["Mês de Referência"], format="%m.%Y", errors="coerce")
-    bloco["Data de Faturamento"] = pd.to_datetime(bloco["Data de Faturamento"], format="%d.%m.%Y",
-                                                  errors="coerce")
-    for c in DIMENSOES.values():
-        if c not in ("Mês de Referência", "Data de Faturamento"):
+    for c in DIMENSOES:
+        if c != "Mês de Referência":
             bloco[c] = bloco[c].fillna("")
     return bloco, total, invalidos
 
 
 def converte(origem, destino):
     """Csv (or the csv inside a zip) -> parquet. Returns (ok, message); writes only if the check passes."""
-    if origem.suffix.lower() == ".zip":
-        z = zipfile.ZipFile(origem)
-        arquivo = z.open(z.namelist()[0])
-    else:
-        z, arquivo = None, open(origem, "rb")
+    dimensoes, medidas, detalhe = le_layout(origem)
+    arquivo, z = abre(origem)
     temporario = destino.with_suffix(".parquet.tmp")
-    escritor, soma, total, linhas, invalidos = None, dict.fromkeys(MEDIDAS.values(), 0.0), None, 0, 0
+    escritor, soma, total, linhas, invalidos = None, dict.fromkeys(MEDIDAS_BW.values(), 0.0), None, 0, 0
     try:
         leitor = pd.read_csv(arquivo, sep=";", encoding="utf-8", skiprows=LINHAS_CABECALHO, header=None,
-                             usecols=list(DIMENSOES) + sorted(set(MEDIDAS) | {d for ds in DETALHE.values() for d in ds}),
+                             usecols=list(dimensoes) + sorted(set(medidas) | {d for ds in detalhe.values() for d in ds}),
                              dtype=str, chunksize=TAMANHO_BLOCO)
         for bruto in leitor:
-            bloco, t, inv = limpa(bruto)
+            bloco, t, inv = limpa(bruto, dimensoes, medidas, detalhe)
             invalidos += inv
             if len(t):
                 total = t.iloc[0]
-            for c in MEDIDAS.values():
+            for c in MEDIDAS_BW.values():
                 soma[c] += bloco[c].sum()
             linhas += len(bloco)
-            tabela = pa.Table.from_pandas(bloco[list(DIMENSOES.values()) + list(MEDIDAS.values())],
+            tabela = pa.Table.from_pandas(bloco[DIMENSOES + list(MEDIDAS_BW.values())],
                                           preserve_index=False)
             if escritor is None:
                 escritor = pq.ParquetWriter(temporario, tabela.schema, compression="zstd")
@@ -148,8 +187,8 @@ def converte(origem, destino):
     if total is None:
         temporario.unlink(missing_ok=True)
         return False, "linha de total (Result.global) não encontrada"
-    alvo = {c: float(total[c]) for c in MEDIDAS.values()}
-    difs = {c: soma[c] - alvo[c] for c in MEDIDAS.values()}
+    alvo = {c: float(total[c]) for c in MEDIDAS_BW.values()}
+    difs = {c: soma[c] - alvo[c] for c in MEDIDAS_BW.values()}
     # R$ must match to the cent; quantities are printed rounded line by line in the BW export, so
     # their sum may differ from the total by some units (tolerance: 1 part in 10 thousand)
     ruins = {c: d for c, d in difs.items()
