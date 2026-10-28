@@ -319,6 +319,13 @@ O SAP não repete a quantidade nas duas linhas (TUSD e TE) do mesmo consumo, par
 dê o total de energia (Passo 5). Por isso a tarifa inteira do cativo, TUSD + TE, é aplicada à linha
 que traz a quantidade.
 
+Na saída, a coluna `Consumo TUSD (kWh)` reproduz o BW e fica zerada no cativo, embora a TUSD seja
+cobrada. Para mostrar a energia sobre a qual cada parcela é devida, as abas de itens trazem no fim as
+colunas `Energia com TUSD (kWh)` e `Energia com TE (kWh)`, calculadas por esta mesma regra: no cativo,
+a energia entra nas duas; no livre e no híbrido, só em TUSD. No SD, cada linha traz a própria
+quantidade por parcela. As colunas de consumo originais não mudam, porque o RNF, o SAMP e os checks
+as leem como vêm do BW.
+
 ## Passo 7 — Multiplicar: o bloco 1
 
 Para cada linha, cada um dos 37 itens e cada camada:
@@ -540,7 +547,7 @@ A saída `1-Entrega/pxq/pxq_<ref>.xlsx` traz:
 | Aba | Conteúdo |
 |---|---|
 | `Leia-me` | O que contém cada aba do arquivo e quais scripts a usam |
-| `Componentes` | Os 37 itens na tarifa de aplicação, blocos 1 e 2, mais os totais de BE, CVA e FIN do bloco 2. Colunas de ajuste: Tarifa Social, regime APE, 1ª e 2ª passadas |
+| `Componentes` | Os 37 itens na tarifa de aplicação, blocos 1 e 2, mais os totais de BE, CVA e FIN do bloco 2. Colunas de ajuste: Tarifa Social, regime APE, 1ª e 2ª passadas. No fim, `Energia com TUSD (kWh)` e `Energia com TE (kWh)` (Passo 6) |
 | `Componentes_BE` | Os mesmos itens na base econômica (é o que alimenta o layout final). No fim, os totais por camada dos dois blocos: `[2] Total TA/BE/CVA/FIN` e `[1] Total TA/BE/CVA/FIN` (estes usados pelo check tarifa homologada × tarifa realizada) |
 | `Familias` | As sete famílias, nas quatro camadas, blocos 1 e 2 |
 | `Nao_tarifaveis_linha` | Cada lançamento não tarifável do BW, linha a linha, com classe, mercado e tipo de faturamento |
