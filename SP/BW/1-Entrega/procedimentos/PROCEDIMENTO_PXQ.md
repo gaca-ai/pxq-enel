@@ -230,6 +230,16 @@ próprias na tabela.
   isentos (CDE, CDE COVID e CDE GD). As linhas derivadas ficam marcadas na coluna `ORIGEM`.
 - É a mesma regra aplicada pelo Mercado Receita.
 
+**TE do suprimento a distribuidoras** (chaves A4 Distribuição: Ceris, CPFL Piratininga e Neoenergia
+Elektro). Até a vigência de 2025, o PCAT publica essas chaves com a TE zerada nas abas "TA - ...". A TE
+do suprimento está só nas abas de TE, na linha "Energia suprimento permissionária" (Ceris) ou
+"concessionária" (as demais), `<500GWh`, com as camadas separadas: `TE BE` (BE), `TE CVA` (CVA) e
+`TE BF` (financeiros). O script completa a TE dessas chaves com essas linhas, item a item, e marca
+`ORIGEM` = `TE_SUPRIMENTO`. As colunas são localizadas pelo rótulo do item, e o mapeamento foi
+conferido contra uma chave comum (A4 Azul ponta), com diferença zero nas três camadas. Resultado: 267,15
+R$/MWh em 2024 e 278,27 em 2025, a mesma tarifa que a planilha do SD cobra da Ceris. A partir de 2026 o
+PCAT já traz a TE na própria chave.
+
 O PCAT escreve o posto por extenso e o BW usa o código abreviado do SAP. Para casar os dois, a
 mesma regra do Passo 3 é aplicada sobre a tabela de tarifas.
 
@@ -504,9 +514,9 @@ lidas e reportadas, para que a conferência contra a aba consolidada as desconte
 - **Abertura.** A receita é aberta na proporção de cada item dentro da tarifa homologada da mesma
   chave (Passo 4). O total fica exato, cada item vai para o seu lugar e o SD sai aberto nas quatro
   camadas.
-- **Ceris.** Na tabela homologada, a chave da Ceris tem o lado TE zerado. Para esse lado, a
-  abertura usa a aba `SD tarifas` da planilha, que só tem a tarifa de aplicação, sem as camadas BE,
-  CVA e FIN.
+- **Ceris.** O lado TE é aberto pela TE de suprimento da tabela homologada (Passo 4), nas quatro
+  camadas. A aba `SD tarifas` só é usada se a tabela tiver o lado da linha zerado, o que não ocorre
+  mais em 2024 a 2026.
 
 ## Passo 14 — Juntar BW e SD e conferir
 
@@ -561,6 +571,23 @@ faturamento e marcados em `Tarifável?`:
 - **NÃO:** sem tarifa homologada.
 - **SEM TARIFA:** lançamento de fornecimento cuja chave não existe na tabela. É o que merece
   investigação: ou o cadastro está errado, ou falta uma linha na tabela de tarifas.
+
+---
+
+## Passo 16 — Saída para a Regulação
+
+O notebook grava também `1-Entrega/pxq_regulacao/PxQ_regulacao_<ref>.xlsx`, para a área de
+Regulação, que precisa da abertura nas camadas da tarifa e não só na tarifa de aplicação.
+
+- **Linhas:** as mesmas da aba `Componentes` (BW tarifável, não tarifáveis e SD), numa aba só.
+- **Colunas, nesta ordem:** identificação do BW; quantidades (consumo TUSD e TE como vêm do BW,
+  demanda, totais, `Energia com TUSD` e `Energia com TE`); receita; a entrega (bloco 2) item a item
+  na base econômica (`BE <item>`), na CVA (`CVA <item>`) e nos financeiros (`FIN <item>`).
+- **Fora:** bloco 1, colunas de ajuste e de regime, valor calculado e diferença. Sem painéis
+  congelados (como no pxq).
+- **Conferências:** a receita é a mesma da aba `Componentes`, e BE + CVA + FIN reproduz a TA do bloco 2
+  em cada linha. Uma linha aberta só na TA, sem camadas, fica com os itens zerados e o notebook avisa
+  o valor; com a TE de suprimento na tabela (Passo 4), não há nenhuma em 2026.
 
 ---
 

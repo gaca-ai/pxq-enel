@@ -57,6 +57,24 @@ DS_FAIXA_02 = "Residencial Desconto Social – faixa 02"
 ISENTOS_DESCONTO_SOCIAL = ["TUSD_CDE", "TUSD_CDE_COVID", "TE_CDE_GD"]
 
 
+# TE of the supply to distributors (A4 Distribuição keys: Ceris, CPFL Piratininga, Neoenergia
+# Elektro). Vintages before 2026 publish these keys with TE = 0 in the "TA - ..." sheets; the TE
+# of supply is only in the TE sheets, row "Energia suprimento permissionária / concessionária"
+# (<500GWh), with the layers apart: "TE BE" (BE), "TE CVA" (CVA) and "TE BF" (financeiros, FIN).
+# Those rows fill the TE items of the keys whose TE is zero; ORIGEM = "TE_SUPRIMENTO".
+# (sessions P1: the SD bills the Ceris TE at exactly this tariff, 278,27 R$/MWh in 2025.)
+ABAS_TE_SUPRIMENTO = {"BE": "TE BE", "CVA": "TE CVA", "FIN": "TE BF"}
+LINHA_SUPRIMENTO = {"Ceris": "Energia suprimento permissionária"}   # other acessantes: concessionária
+LINHA_SUPRIMENTO_PADRAO = "Energia suprimento concessionária"
+# item label in the TE sheets (row 4) -> item column of the tariff table
+ITEM_TE = {
+    "P&D": "TE_PeD", "ESS/ERR": "TE_ESSERR", "CFURH": "TE_CFURH", "CDE Covid TE": "TE_CDE_COVID",
+    "CDE ELET": "TE_CDE_ELET", "CDE GD": "TE_CDE_GD", "ENERGIA REVENDA": "TE_ENERGIA",
+    "ITAIPU": "TE_TRANSPORTE_ITAIPU", "TUST ITAIPU": "TE_TUST_ITAIPU", "TUST CI": "TE_TUST_CI",
+    "SUBSIDIO": "TE Subsidio", "PERDAS RB/C": "TE_Per_RB",
+}
+
+
 def s(v):
     return "" if v is None else str(v).strip()
 
@@ -146,6 +164,70 @@ def deriva_desconto_social(tabela):
     return tabela
 
 
+def le_te_suprimento(caminho):
+    """{(camada, linha): {item: R$/MWh}} of the supply rows of the TE sheets. Columns located by the
+    item label (row 4), never by position; the row total (last column) is kept as a check."""
+    wb = openpyxl.load_workbook(caminho, read_only=True, data_only=True)
+    out = {}
+    try:
+        for camada, aba in ABAS_TE_SUPRIMENTO.items():
+            if aba not in wb.sheetnames:
+                raise ValueError(f"{caminho.name}: aba {aba} ausente")
+            linhas = list(wb[aba].iter_rows(values_only=True))
+            rotulos = [s(v) for v in linhas[3]]
+            col = {ITEM_TE[r]: j for j, r in enumerate(rotulos) if r in ITEM_TE}
+            faltam = sorted(set(ITEM_TE.values()) - set(col))
+            if faltam:
+                raise ValueError(f"{caminho.name} / {aba}: itens ausentes no cabecalho: {faltam}")
+            total = max(j for j, v in enumerate(linhas[2]) if s(v))   # row total: last labelled column of row 3
+            for r in linhas[4:]:
+                nome = s(r[1])
+                if nome.startswith("Energia suprimento") and "<500" in s(r[4]):
+                    valores = {it: num(r[j]) for it, j in col.items()}
+                    soma = sum(valores.values())
+                    if abs(soma - num(r[total])) > 0.01:
+                        raise ValueError(f"{caminho.name} / {aba} / {nome}: itens somam {soma:.4f}, "
+                                         f"total da linha {num(r[total]):.4f}")
+                    out[(camada, nome)] = valores
+    finally:
+        wb.close()
+    return out
+
+
+def completa_te_suprimento(tabela):
+    """Fill the TE items of the A4 Distribuição MWh keys whose TE is zero, from the supply rows of
+    the TE sheets of the same vintage (layers BE, CVA, FIN; TA = BE + CVA + FIN)."""
+    tabela = tabela.copy()
+    for v in VIGENCIAS:
+        alvo = ((tabela["ANO_VIGENCIA"] == v["ano"]) & (tabela["MODALIDADE"] == "Distribuição")
+                & (tabela["UNIDADE"] == "MWh"))
+        sem_te = tabela.loc[alvo & (tabela["CAMADA"] == "TA") & (tabela["Total TE"].abs() < 1e-9), "ACESSANTE"]
+        if sem_te.empty:
+            continue
+        sup = le_te_suprimento(v["arquivo"])
+        for acessante in sorted(sem_te.unique()):
+            linha = LINHA_SUPRIMENTO.get(acessante, LINHA_SUPRIMENTO_PADRAO)
+            ta = dict.fromkeys(ITEM_TE.values(), 0.0)
+            for camada in ("BE", "CVA", "FIN"):
+                if (camada, linha) not in sup:
+                    raise ValueError(f"{v['ano']}: linha '{linha}' ausente na aba {ABAS_TE_SUPRIMENTO[camada]}")
+                vals = sup[(camada, linha)]
+                m = alvo & (tabela["CAMADA"] == camada) & (tabela["ACESSANTE"] == acessante)
+                for it, x in vals.items():
+                    tabela.loc[m, it] = x
+                    ta[it] += x
+                tabela.loc[m, "Total TE"] = sum(vals.values())
+                tabela.loc[m, "ORIGEM"] = "TE_SUPRIMENTO"
+            m = alvo & (tabela["CAMADA"] == "TA") & (tabela["ACESSANTE"] == acessante)
+            for it, x in ta.items():
+                tabela.loc[m, it] = x
+            tabela.loc[m, "Total TE"] = sum(ta.values())
+            tabela.loc[m, "ORIGEM"] = "TE_SUPRIMENTO"
+            print(f"{v['ano']}: TE de suprimento completada para {acessante} ({linha}): "
+                  f"TA {sum(ta.values()):.2f} R$/MWh")
+    return tabela
+
+
 def main():
     OUTDIR.mkdir(parents=True, exist_ok=True)
     blocos = []
@@ -228,6 +310,7 @@ def main():
             tabela[it] = 0.0
     tabela = tabela[colunas].fillna(0.0)
     tabela = deriva_desconto_social(tabela)
+    tabela = completa_te_suprimento(tabela)
 
     # sanity: vigencias contiguous, no gap or overlap
     ordenadas = sorted(VIGENCIAS, key=lambda v: v["inicio"])
