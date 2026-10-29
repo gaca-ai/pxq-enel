@@ -81,6 +81,7 @@ SP/BW/
 ├── tbl/
 │   ├── tarifas/tarifa_long.csv   tarifas homologadas, todas as vigências e camadas
 │   ├── modelo/De-Para_Modelo_PyC.xlsx  modelo da área para o layout Receita Faturada
+│   ├── modelo/De-Para_Modelo_PyC_sugerido.xlsx  o mesmo, com a linha GERAÇÃO / E (P27)
 │   ├── calendario/calendario_leitura.csv  data de leitura e ciclo de cada lote, por mês
 │   └── calendario/de_para_lote.csv  lote do BW -> lote do calendário de leitura
 └── src/                          arquivos de origem (não editados pelo processo)
@@ -109,6 +110,7 @@ SP/BW/
 | `tbl/` | Tabelas do processo: tarifas homologadas, calendário de leitura e o modelo do layout Receita Faturada. |
 | `tbl/calendario/` | `calendario_leitura.csv`: uma linha por mês, grupo e lote, com a data de leitura, os dias de consumo e o início e fim do ciclo. `de_para_lote.csv`: o grupo e o nº do lote do calendário para cada lote do BW (campo `Conjunto de Contrato`), validado pela área do BW. Ambos em csv para facilitar a passagem para a TI. |
 | `tbl/modelo/De-Para_Modelo_PyC.xlsx` | Modelo da área para o layout Receita Faturada: a aba "Receita Faturada" define as colunas e a grade de linhas; a aba "Instruções", o de-para dos itens tarifários para os grupos do layout. Sem ele a Receita Faturada não é gerada. Não tem dados da Enel e é versionado no Git. |
+| `tbl/modelo/De-Para_Modelo_PyC_sugerido.xlsx` | O modelo da área com a linha GERAÇÃO / E (energia das geradoras) em FAT, REFAT e CNR, sugerida à área em 29/10/2026 (sessions, P27). É o modelo que o conversor usa; o arquivo da área fica intacto. Para voltar ao original, basta trocar `ARQ_MODELO` em `gera_receita_faturada.py`. Versionado no Git. |
 | `src/` | Fontes externas: a extração de receita do BW, a planilha do SD, os PCATs (`src/pcats/`), o calendário de leitura (`calendario_leitura_<ano>.xlsx`) e o Mercado Receita do período tarifário. |
 
 Os scripts localizam os arquivos a partir da pasta `SP/BW` (variável `PXQ_BASE`), e não da pasta onde
@@ -397,31 +399,31 @@ que explica o restante? A resposta é uma conta de chegada, que fecha exatamente
 
 | Item | Unidade | jan | fev | mar | abr | mai | jun | jul | ago |
 |---|---|---|---|---|---|---|---|---|---|
-| (a) Receita faturada (base tarifável) | R$ milhões | 1.940,7 | 1.835,7 | 1.798,1 | 1.943,8 | 1.848,7 | 1.706,7 | 1.812,8 | 1.938,6 |
-| (b) Bloco 1 (tarifa cheia) | R$ milhões | 2.052,0 | 1.951,6 | 1.911,3 | 2.053,8 | 1.959,3 | 1.816,1 | 1.932,5 | 2.075,2 |
-| (c) Diferença a explicar, (b) − (a) | R$ milhões | 111,3 | 115,9 | 113,2 | 109,9 | 110,6 | 109,4 | 119,7 | 136,6 |
+| (a) Receita faturada (base tarifável) | R$ milhões | 1.940,0 | 1.834,9 | 1.797,5 | 1.943,1 | 1.848,0 | 1.706,1 | 1.812,3 | 1.938,0 |
+| (b) Bloco 1 (tarifa cheia) | R$ milhões | 2.051,4 | 1.950,9 | 1.910,8 | 2.053,1 | 1.958,6 | 1.815,6 | 1.932,0 | 2.074,7 |
+| (c) Diferença a explicar, (b) − (a) | R$ milhões | 111,4 | 116,0 | 113,3 | 110,0 | 110,6 | 109,5 | 119,7 | 136,7 |
 | (d) Tarifa Social (faixa gratuita) | R$ milhões | −38,8 | −37,1 | −36,0 | −36,1 | −35,7 | −34,8 | −40,5 | −45,5 |
 | (e) Isenção APE | R$ milhões | −9,9 | −16,1 | −14,7 | −9,2 | −11,0 | −13,0 | −13,1 | −16,1 |
 | (f) Fonte incentivada (1ª passada) | R$ milhões | −63,0 | −63,5 | −64,1 | −66,3 | −63,0 | −62,9 | −63,8 | −72,8 |
-| (g) 2ª passada, líquida | R$ milhões | 0,3 | 0,9 | 1,5 | 1,6 | −0,8 | 1,3 | −2,3 | −2,2 |
+| (g) 2ª passada, líquida | R$ milhões | 0,3 | 0,8 | 1,4 | 1,5 | −0,9 | 1,2 | −2,3 | −2,3 |
 | (g1) dela, TUSD Consumo Próprio não faturada por decisão da Empresa | R$ milhões | −1,6 | −1,4 | −0,7 | −0,9 | −2,6 | −0,7 | −0,8 | −3,3 |
-| (g2) dela, demais grupos | R$ milhões | 1,9 | 2,3 | 2,2 | 2,4 | 1,8 | 2,0 | −1,5 | 1,0 |
+| (g2) dela, demais grupos | R$ milhões | 1,9 | 2,2 | 2,2 | 2,3 | 1,7 | 1,9 | −1,5 | 1,0 |
 | (h) Resíduo sem item tarifário | R$ milhões | 0,0 | 0,0 | 0,1 | 0,1 | 0,0 | 0,0 | 0,1 | 0,0 |
-| (i) 2ª passada, bruta | R$ milhões | 3,7 | 7,9 | 3,4 | 4,0 | 4,6 | 3,0 | 5,7 | 7,9 |
+| (i) 2ª passada, bruta | R$ milhões | 3,8 | 8,0 | 3,4 | 4,1 | 4,7 | 3,1 | 5,8 | 7,9 |
 
 **Em relação à receita faturada**
 
 | Item | Unidade | jan | fev | mar | abr | mai | jun | jul | ago |
 |---|---|---|---|---|---|---|---|---|---|
-| (c) Diferença a explicar | % de (a) | 5,74 | 6,31 | 6,30 | 5,66 | 5,98 | 6,41 | 6,60 | 7,05 |
-| (d) Tarifa Social | % de (a) | −2,00 | −2,02 | −2,00 | −1,86 | −1,93 | −2,04 | −2,24 | −2,35 |
+| (c) Diferença a explicar, (b) − (a) | % de (a) | 5,74 | 6,32 | 6,30 | 5,66 | 5,99 | 6,42 | 6,61 | 7,05 |
+| (d) Tarifa Social (faixa gratuita) | % de (a) | −2,00 | −2,02 | −2,01 | −1,86 | −1,93 | −2,04 | −2,24 | −2,35 |
 | (e) Isenção APE | % de (a) | −0,51 | −0,88 | −0,82 | −0,47 | −0,60 | −0,76 | −0,72 | −0,83 |
 | (f) Fonte incentivada (1ª passada) | % de (a) | −3,25 | −3,46 | −3,56 | −3,41 | −3,41 | −3,69 | −3,52 | −3,76 |
-| (g) 2ª passada, líquida | % de (a) | +0,02 | +0,05 | +0,08 | +0,08 | −0,04 | +0,07 | −0,13 | −0,12 |
+| (g) 2ª passada, líquida | % de (a) | +0,01 | +0,04 | +0,08 | +0,08 | −0,05 | +0,07 | −0,13 | −0,12 |
 | (g1) dela, TUSD Consumo Próprio não faturada | % de (a) | −0,08 | −0,08 | −0,04 | −0,04 | −0,14 | −0,04 | −0,04 | −0,17 |
-| (g2) dela, demais grupos | % de (a) | +0,10 | +0,12 | +0,12 | +0,12 | +0,10 | +0,12 | −0,08 | +0,05 |
+| (g2) dela, demais grupos | % de (a) | +0,10 | +0,12 | +0,12 | +0,12 | +0,09 | +0,11 | −0,08 | +0,05 |
 | (h) Resíduo sem item tarifário | % de (a) | 0,00 | 0,00 | 0,00 | 0,01 | 0,00 | 0,00 | 0,00 | 0,00 |
-| (i) 2ª passada, bruta | % de (a) | 0,19 | 0,43 | 0,19 | 0,21 | 0,25 | 0,18 | 0,32 | 0,41 |
+| (i) 2ª passada, bruta | % de (a) | 0,20 | 0,44 | 0,19 | 0,21 | 0,25 | 0,18 | 0,32 | 0,41 |
 
 **Leitura**
 
@@ -436,7 +438,7 @@ que explica o restante? A resposta é uma conta de chegada, que fecha exatamente
 - A maior parte negativa da 2ª passada é a TUSD do consumo próprio, não faturada por decisão da
   Empresa (g1): de 0,7 a 3,3 milhões por mês. Os meses com mais consumo próprio (maio e agosto) são
   os de faturamento acumulado de várias referências. Sem ela, a 2ª passada dos demais grupos (g2) é
-  positiva e estável, entre 0,10% e 0,12% da receita, exceto em julho, mês do reajuste.
+  positiva e estável, entre 0,09% e 0,12% da receita, exceto em julho, mês do reajuste.
 - O notebook não separa (g1): a 2ª passada fecha o consumo próprio na receita do BW, distribuindo a
   TUSD não faturada entre todos os itens do grupo, TUSD e TE. No bloco 2, o consumo próprio fica na
   receita do BW, com a TE um pouco abaixo do que foi efetivamente cobrado. Por isso o PxQ fica igual
@@ -496,38 +498,38 @@ mostra o peso de cada família no desvio total.
 
 | Diferença P × Q − MR | Unidade | jan | fev | mar | abr | mai | Acumulado | Acumulado, % da receita do MR |
 |---|---|---|---|---|---|---|---|---|
-| BE · FIO A | % do MR | −2,37 | −0,71 | −0,74 | −0,94 | −0,74 | −1,11 | −0,10 |
+| BE · FIO A | % do MR | −2,38 | −0,72 | −0,75 | −0,95 | −0,75 | −1,13 | −0,10 |
 | BE · FIO B | % do MR | −0,74 | −0,70 | −0,69 | −0,93 | −0,67 | −0,75 | −0,21 |
-| BE · ENCARGOS | % do MR | +0,67 | −1,21 | −0,71 | +0,54 | +0,45 | −0,04 | −0,01 |
-| BE · PERDAS | % do MR | +0,01 | −0,02 | 0,00 | −0,18 | 0,00 | −0,04 | 0,00 |
-| BE · ENERGIA | % do MR | −0,06 | −0,11 | −0,10 | −0,34 | −0,12 | −0,15 | −0,04 |
+| BE · ENCARGOS | % do MR | +0,62 | −1,28 | −0,76 | +0,49 | +0,39 | −0,09 | −0,03 |
+| BE · PERDAS | % do MR | −0,02 | −0,05 | −0,03 | −0,21 | −0,03 | −0,07 | 0,00 |
+| BE · ENERGIA | % do MR | −0,13 | −0,20 | −0,17 | −0,41 | −0,19 | −0,22 | −0,07 |
 | BE · RI e OUTROS | % do MR | — | — | — | — | — | — | — |
-| CVA (total) | % do MR | +2,59 | −2,19 | −1,00 | +2,20 | +1,79 | +0,69 | +0,01 |
-| FIN (total) | % do MR | +1,92 | +1,81 | +1,54 | +1,90 | +1,57 | +1,75 | +0,05 |
-| **Total** | % do MR | **−0,17** | **−0,62** | **−0,46** | **−0,22** | **−0,10** | **−0,31** | **−0,31** |
+| CVA (total) | % do MR | +2,56 | −2,22 | −1,02 | +2,18 | +1,76 | +0,66 | +0,01 |
+| FIN (total) | % do MR | +1,98 | +1,88 | +1,60 | +1,97 | +1,63 | +1,82 | +0,06 |
+| **Total** | % do MR | **−0,21** | **−0,66** | **−0,50** | **−0,26** | **−0,14** | **−0,35** | **−0,35** |
 
 Em valores absolutos:
 
 | Diferença P × Q − MR | Unidade | jan | fev | mar | abr | mai | Acumulado |
 |---|---|---|---|---|---|---|---|
-| BE · FIO A | R$ milhões | −4,3 | −1,2 | −1,2 | −1,7 | −1,3 | −9,7 |
+| BE · FIO A | R$ milhões | −4,3 | −1,2 | −1,3 | −1,7 | −1,3 | −9,8 |
 | BE · FIO B | R$ milhões | −4,0 | −3,6 | −3,4 | −5,0 | −3,5 | −19,5 |
-| BE · ENCARGOS | R$ milhões | 3,8 | −6,6 | −3,8 | 3,1 | 2,4 | −1,1 |
-| BE · PERDAS | R$ milhões | 0,0 | 0,0 | 0,0 | −0,2 | 0,0 | −0,2 |
-| BE · ENERGIA | R$ milhões | −0,3 | −0,6 | −0,5 | −2,0 | −0,6 | −4,1 |
+| BE · ENCARGOS | R$ milhões | 3,5 | −7,0 | −4,0 | 2,8 | 2,1 | −2,6 |
+| BE · PERDAS | R$ milhões | 0,0 | −0,1 | 0,0 | −0,3 | 0,0 | −0,4 |
+| BE · ENERGIA | R$ milhões | −0,8 | −1,1 | −0,9 | −2,4 | −1,0 | −6,2 |
 | BE · RI e OUTROS | R$ milhões | 0,0 | 0,0 | 0,0 | 0,0 | 0,0 | 0,0 |
-| CVA (total) | R$ milhões | 0,4 | −0,3 | −0,2 | 0,4 | 0,3 | 0,5 |
-| FIN (total) | R$ milhões | 1,1 | 1,0 | 0,8 | 1,1 | 0,9 | 5,0 |
-| **Total** | R$ milhões | **−3,3** | **−11,4** | **−8,3** | **−4,2** | **−1,8** | **−29,0** |
+| CVA (total) | R$ milhões | 0,4 | −0,4 | −0,2 | 0,4 | 0,3 | 0,5 |
+| FIN (total) | R$ milhões | 1,2 | 1,1 | 0,9 | 1,2 | 0,9 | 5,2 |
+| **Total** | R$ milhões | **−4,1** | **−12,2** | **−9,0** | **−5,0** | **−2,5** | **−32,7** |
 | Referência: receita do Mercado Receita | R$ milhões | 1.944,0 | 1.847,1 | 1.806,4 | 1.948,0 | 1.850,5 | 9.395,9 |
 
 Leitura:
 
-- **Total.** O P × Q fica a menos de 0,7% do Mercado Receita em todos os meses, e a −0,31% no
+- **Total.** O P × Q fica a menos de 0,7% do Mercado Receita em todos os meses, e a −0,35% no
   acumulado.
 - **CVA e FIN.** Os percentuais são maiores porque as camadas são pequenas. A maior diferença
-  mensal é de R$ 1,1 milhão, menos de 0,1% da receita do mês.
-- **Encargos.** Oscilam em torno de zero (acumulado −0,04%). A isenção APE registrada num mês
+  mensal é de R$ 1,2 milhão, menos de 0,1% da receita do mês.
+- **Encargos.** Oscilam em torno de zero (acumulado −0,09%). A isenção APE registrada num mês
   inclui créditos de meses anteriores, e o BW não permite separá-los.
 - **Fio A de janeiro.** É o único ponto fora do padrão: a demanda dos livres A2 no BW fica abaixo
   da do MR nesse mês. A investigação está registrada em [`sessions.md`](sessions.md).
@@ -550,13 +552,13 @@ Diferença tarifa homologada − tarifa realizada (R$ milhões; positivo = desco
 | | jan | fev | mar | abr | mai | jun | jul | ago |
 |---|---|---|---|---|---|---|---|---|
 | Tarifa Social – DMR | 37,3 | 34,5 | 33,3 | 32,7 | 32,9 | 31,9 | 37,5 | 42,7 |
-| SCEE - Baixa Renda(\*) | 1,5 | 2,6 | 2,7 | 3,4 | 2,7 | 2,8 | 3,1 | 2,8 |
+| SCEE - Baixa Renda(*) | 1,5 | 2,6 | 2,7 | 3,4 | 2,7 | 2,8 | 3,1 | 2,8 |
 | APE | 9,9 | 16,1 | 14,7 | 9,2 | 11,0 | 13,0 | 13,1 | 16,1 |
 | Fonte incentivada | 63,0 | 63,5 | 64,1 | 66,3 | 63,0 | 62,9 | 63,8 | 72,8 |
-| 2ª passada | −0,3 | −0,9 | −1,5 | −1,6 | 0,8 | −1,3 | 2,3 | 2,2 |
+| 2ª passada | −0,3 | −0,8 | −1,4 | −1,5 | 0,9 | −1,2 | 2,3 | 2,3 |
 | dela, TUSD Consumo Próprio não faturada | 1,6 | 1,4 | 0,7 | 0,9 | 2,6 | 0,7 | 0,8 | 3,3 |
-| dela, demais grupos | −1,9 | −2,3 | −2,2 | −2,4 | −1,8 | −2,0 | 1,5 | −1,0 |
-| **Total** | **111,4** | **115,9** | **113,3** | **110,1** | **110,6** | **109,4** | **119,8** | **136,7** |
+| dela, demais grupos | −1,9 | −2,2 | −2,2 | −2,3 | −1,7 | −1,9 | 1,5 | −1,0 |
+| **Total** | **111,4** | **116,0** | **113,3** | **110,1** | **110,6** | **109,5** | **119,8** | **136,7** |
 
 O total é a linha (c) da seção 5.1, a menos do resíduo; Tarifa Social – DMR mais SCEE - Baixa
 Renda(\*), APE, fonte incentivada e 2ª passada são as linhas (d), (e), (f) e (g) com o sinal invertido.

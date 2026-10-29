@@ -24,6 +24,7 @@ SAMP/1-Entrega/pxq/
 
 # Exceção: modelo do layout Receita Faturada (só cabeçalhos e de-para, sem dados)
 !SP/BW/tbl/modelo/De-Para_Modelo_PyC.xlsx
+!SP/BW/tbl/modelo/De-Para_Modelo_PyC_sugerido.xlsx
 
 # Python / Jupyter
 __pycache__/

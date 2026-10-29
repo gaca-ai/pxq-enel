@@ -35,8 +35,9 @@ Regras (README, secao 5.1):
 - Classe principal "Nao atribuido": categoria residencial vai para Residencial, ou para
   Residencial Baixa Renda quando todas as subclasses listadas sao de baixa renda ou
   desconto social.
-- Linha E sem correspondente no modelo (GERACAO): o valor vai para Outros da linha D da mesma
-  opcao; o MWh nao e gravado e aparece em nota na aba Conferencia.
+- Linha E sem correspondente no modelo: o valor vai para Outros da linha D da mesma opcao; o MWh
+  nao e gravado e aparece em nota na aba Conferencia. O modelo usado (De-Para_Modelo_PyC_sugerido.xlsx)
+  tem a linha GERACAO / E, e o caso deixou de ocorrer com a energia das geradoras.
 - PIS/COFINS e ultrapassagem do SD (geradoras, suprimentos e uso da distribuicao) vem do pxq como
   nao tarifaveis e vao para PIS/COFINS e UD/ER da linha da propria opcao.
 - Valores em R$ mil; so as linhas com valor sao gravadas.
@@ -53,7 +54,10 @@ import pandas as pd
 import openpyxl
 
 BASE = Path(os.environ.get("PXQ_BASE", r"C:\python_projects\claude\p_x_q\SP\BW"))
-ARQ_MODELO = BASE / "tbl" / "modelo" / "De-Para_Modelo_PyC.xlsx"     # layout model of the area (versioned)
+# Layout model: the area's model plus a GERACAO / E row (energy of the generators, sessions P27),
+# kept in a separate file so the area's model stays untouched. To go back, point to
+# "De-Para_Modelo_PyC.xlsx".
+ARQ_MODELO = BASE / "tbl" / "modelo" / "De-Para_Modelo_PyC_sugerido.xlsx"   # versioned
 DIR_PXQ = BASE / "1-Entrega" / "pxq"
 DIR_SAIDA = BASE / "1-Entrega" / "receita_faturada"
 

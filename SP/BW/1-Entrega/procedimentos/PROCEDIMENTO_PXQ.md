@@ -104,10 +104,10 @@ Essa base é a mesma do informe de gestão.
 
 ## Passo 2 — Separar o que é fornecimento
 
-Só entram no cálculo os lançamentos que têm tarifa homologada por item: **30 códigos
+Só entram no cálculo os lançamentos que têm tarifa homologada por item: **32 códigos
 estatísticos** de consumo e demanda.
 
-- **Consumo do cativo:** 16 códigos, inclusive a energia compensada do posto convencional.
+- **Consumo do cativo:** 18 códigos, inclusive a energia compensada do posto convencional e do fora ponta.
 
   | Código | Descrição no BW |
   |---|---|
@@ -119,6 +119,7 @@ estatísticos** de consumo e demanda.
   | `ZQC167` / `ZQC168` | Consumo IP - Faturamento, TE / TUSD |
   | `ZQC218` / `ZQC219` | Consumo Intermediário, TE / TUSD |
   | `ZQC225` / `ZQC226` | Energia Compensada (Convencional), TE / TUSD |
+  | `ZQC223` / `ZQC224` | Energia Compensada Fora de Ponta, TE / TUSD (crédito do SCEE, energia e valor negativos; chave fora ponta do consumo) |
 
 - **Consumo do livre:** 2 códigos.
 
@@ -160,7 +161,7 @@ BW e para que o conversor possa aproveitar o que interessa ao layout final.
 | Reativos; ultrapassagem de demanda: cativo (`ZQD021`, `ZQD022`, `ZQD023`) e livre (`ZQD019`, `ZQD020`, `ZQD037`) | Multa sobre a demanda acima da contratada, sem item na tabela homologada | Coluna UD/ER da Receita Faturada |
 | Substituição tributária dos livres | Débito e crédito se anulam no mês | Coluna Outros da Receita Faturada (efeito zero) |
 | "TUSD - Desconto Consumo" (`ZQC036`, `ZQC181`, `ZQC182`) e o estorno "Complemento Res. 166/05" (`ZQC059`, `ZQC183`, `ZQC184`) | Isenção do APE, sem quantidade | Usados no Passo 9 |
-| Acertos homologados pela CCEE, energia compensada fora ponta e intermediário, desconto comercial | Sem tarifa por item | Coluna Outros da Receita Faturada |
+| Acertos homologados pela CCEE, energia compensada intermediária (`ZQC234`, `ZQC235`: a chave não existe na tabela de tarifas), desconto comercial | Sem tarifa por item | Coluna Outros da Receita Faturada |
 
 Os tributos e as bandeiras são identificados pela regra da área de faturamento: operação principal
 `R/#` para os tributos e os oito códigos acima para as bandeiras. Dentro dos tributos, o campo de
@@ -609,9 +610,11 @@ tarifa realizada use exatamente a mesma regra com o bloco 1.
     dentro de cada classe;
   - a unidade segue o próprio lançamento: demanda, potência, kW, UFDR e conexão vão para a linha D;
     o restante, para a linha E.
-- **Geração na linha de energia.** O modelo só tem a linha D para geração. O valor da energia vai
-  para Outros da linha GERAÇÃO / D, e o MWh, que não pode ser somado ao MW, aparece em nota na aba
-  `Conferencia`.
+- **Geração na linha de energia.** O conversor usa o modelo `tbl/modelo/De-Para_Modelo_PyC_sugerido.xlsx`,
+  que é o modelo da área com a linha GERAÇÃO / E (sessions, P27). A energia das geradoras (usinas da
+  EMAE) vai para essa linha, com o valor dela, e a coluna CONSUMO fecha com o informe de gestão. Se o
+  modelo não tiver a linha E de uma opção, o valor vai para Outros da linha D e o MWh aparece em nota
+  na aba `Conferencia`.
 - **Aba `Lotes sem calendário`.** Cópia da aba `Lotes_sem_calendario` do pxq: lotes do BW com
   faturamento normal fora do de-para do calendário de leitura, que ficaram com a tarifa do mês
   (Passo 4).
