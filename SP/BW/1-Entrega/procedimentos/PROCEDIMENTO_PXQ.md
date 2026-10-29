@@ -525,31 +525,6 @@ receita. As linhas entram com regime `direto` e diferença zero, identificadas n
 As conferências do SD comparam a receita aberta com a aba consolidada da planilha, cliente a
 cliente e no mesmo mês de referência.
 
-### Mudança prevista na fonte do SD (pendência P23)
-
-A planilha atual será substituída pelo arquivo `SD_consumo_demanda_receita_e_impostos.xlsx`, que
-traz, por agente e mês de competência, receita com tributos, PIS, COFINS, consumo e demanda. O total
-é igual à coluna "Geradoras + CERIS" da aba 3.2 do informe de gestão. A adaptação do notebook
-aguarda a área incluir no arquivo a separação de demanda e energia em ponta e fora ponta.
-
-Regras que valerão com o arquivo novo:
-
-- **Receita.** Receita do arquivo − PIS − COFINS, por agente e mês.
-- **Abertura dos agentes, exceto a CERIS.** Quantidade de cada posto × tarifa homologada da chave do
-  agente, como hoje.
-- **Abertura da CERIS (estimada).** A tabela homologada não tem o lado TE da CERIS, e o arquivo novo
-  não separa a receita em energia (TE) e uso da rede (TUSD).
-  - Demanda e energia TUSD: quantidade × tarifa homologada.
-  - Energia TE: a sobra da receita líquida, aberta pela composição da TE da CERIS copiada uma vez
-    da aba `SD tarifas` da planilha antiga para `tbl/tarifas` (cerca de 81% em Compra de Energia,
-    10% em ESS/ERR/ERCAP e o restante em Angra, Transporte Itaipu e Perdas). Essa composição é
-    revista a cada reajuste.
-  - A ultrapassagem de demanda da CERIS fica dentro dessa sobra.
-  - **Por que estimar.** O total da CERIS fica exato; só a divisão entre os itens é estimada. A
-    CERIS soma cerca de R$ 9 milhões por ano (0,03% da receita), e a energia TE estimada pesa 0,1%
-    em Compra de Energia. Não impacta o resultado final, e não justifica pedir à área o
-    detalhamento da receita.
-
 ## Passo 15 — Gerar a planilha
 
 A saída `1-Entrega/pxq/pxq_<ref>.xlsx` traz:
@@ -709,7 +684,7 @@ projetado e sem valor de conferência.
    grade completa do modelo (opção × classe × unidade). Por isso o check é uma subtração da mesma
    célula nas duas abas.
    - O padrão soma as classes porque o cadastro de classe do cliente livre é diferente no MR e no
-     BW (README 5.4).
+     BW (sessions, P21).
 6. Opção de compra: LIVRE APE entra como LIVRE e DISTRIBUIÇÃO como USO D. Os clientes GD (Sistema de
    Compensação) ficam em CATIVO, como no PxQ (README 6.1). O ERC fica fora, porque não passa pelo BW,
    e o valor aparece na aba `Conciliacao`.

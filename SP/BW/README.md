@@ -61,6 +61,7 @@ SP/BW/
 │   ├── resultados/               um arquivo de conferência por mês
 │   ├── receita_faturada_MR/      layout Receita Faturada do MR e check PxQ − MR, por mês
 │   ├── receita_faturada_Bl1_vs_Bl2/  tarifa homologada × tarifa realizada e descontos por origem
+│   ├── tabelas_readme/           tabelas da seção 5 deste documento (.md e .xlsx)
 │   └── consolidado_*.xlsx        consolidados mês a mês
 ├── 3-Py/                         todos os scripts Python, separados pela pasta que alimentam
 │   ├── 1-Entrega/
@@ -68,13 +69,15 @@ SP/BW/
 │   │   ├── extrai_pcat.py            gera a tabela de tarifas a partir dos PCATs
 │   │   ├── gera_calendario_leitura.py  converte o calendário de leitura em tabela
 │   │   └── gera_receita_faturada.py  converte o pxq no layout Receita Faturada
-│   └── 2-Checks/
-│       ├── le_mr.py                  lê o Mercado Receita do mês
-│       ├── check_mr_bloco2.py        check por opção de compra e subgrupo
-│       ├── check_mr_camadas.py       check por família e camada
-│       ├── consolida_check_mr_bloco2.py  consolida o check por subgrupo
-│       ├── gera_receita_faturada_mr.py   layout Receita Faturada do MR e check célula a célula
-│       └── gera_receita_faturada_bl1_vs_bl2.py  tarifa homologada × tarifa realizada (descontos)
+│   ├── 2-Checks/
+│   │   ├── le_mr.py                  lê o Mercado Receita do mês
+│   │   ├── check_mr_bloco2.py        check por opção de compra e subgrupo
+│   │   ├── check_mr_camadas.py       check por família e camada
+│   │   ├── consolida_check_mr_bloco2.py  consolida o check por subgrupo
+│   │   ├── gera_receita_faturada_mr.py   layout Receita Faturada do MR e check célula a célula
+│   │   └── gera_receita_faturada_bl1_vs_bl2.py  tarifa homologada × tarifa realizada (descontos)
+│   └── readme/
+│       └── tabelas_readme.ipynb      gera as tabelas de resultados da seção 5
 ├── tbl/
 │   ├── tarifas/tarifa_long.csv   tarifas homologadas, todas as vigências e camadas
 │   ├── modelo/De-Para_Modelo_PyC.xlsx  modelo da área para o layout Receita Faturada
@@ -93,14 +96,16 @@ SP/BW/
 | `1-Entrega/receita_faturada/receita_faturada_<ref>.xlsx` | O pxq convertido no layout Receita Faturada, com a aba `Conferencia`, que concilia o total com a receita do BW, e a aba `Lotes sem calendário`. |
 | [`1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md`](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md) | Cada transformação do notebook e dos scripts, e o motivo dela. |
 | `2-Checks/resultados/` | Conferências mensais contra o Mercado Receita e a conferência contra o informe de gestão. |
-| `2-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês (seção 5.4). |
-| `2-Checks/receita_faturada_Bl1_vs_Bl2/` | Um arquivo por mês com o layout pela tarifa homologada (bloco 1) e pela tarifa realizada (bloco 2), a diferença por fórmula e a diferença separada em APE, fonte incentivada e 2ª passada, e o consolidado com uma linha por mês (seção 5.5). |
+| `2-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês. |
+| `2-Checks/receita_faturada_Bl1_vs_Bl2/` | Um arquivo por mês com o layout pela tarifa homologada (bloco 1) e pela tarifa realizada (bloco 2), a diferença por fórmula e a diferença separada em APE, fonte incentivada e 2ª passada, e o consolidado com uma linha por mês (seção 5.4). |
+| `2-Checks/tabelas_readme/` | `tabelas_readme.md` e `tabelas_readme.xlsx`: as tabelas de resultados da seção 5 (5.1, 5.3 e 5.4), geradas por `3-Py/readme/tabelas_readme.ipynb`. No Excel, uma aba por tabela com a explicação e a seção correspondente. Fora do Git. |
 | `2-Checks/consolidado_*.xlsx` | Checks por família e camada e por opção de compra e subgrupo, consolidados mês a mês (seção 5.3). |
 | [`3-Py/1-Entrega/prepara_base_bw.py`](3-Py/1-Entrega/prepara_base_bw.py) | Converte a extração mensal do BW (csv de mais de 200 MB) em parquet limpo em `src/parquet/`, confere o total contra o próprio csv, compacta o csv em `src/csv_original/` e o apaga. Roda antes do notebook. |
 | [`3-Py/1-Entrega/extrai_pcat.py`](3-Py/1-Entrega/extrai_pcat.py) | Lê os PCATs (planilhas de cálculo tarifário da ANEEL) e grava `tbl/tarifas/tarifa_long.csv`. Roda uma vez a cada nova vigência tarifária. |
 | [`3-Py/1-Entrega/gera_calendario_leitura.py`](3-Py/1-Entrega/gera_calendario_leitura.py) | Lê o calendário de leitura (`src/calendario_leitura_<ano>.xlsx`, uma aba por mês) e grava `tbl/calendario/calendario_leitura.csv`: `python 3-Py/1-Entrega/gera_calendario_leitura.py 2026`. Carrega só as abas presentes e substitui apenas esses meses na tabela. |
 | [`3-Py/1-Entrega/gera_receita_faturada.py`](3-Py/1-Entrega/gera_receita_faturada.py) | Converte o pxq no layout Receita Faturada: `python 3-Py/1-Entrega/gera_receita_faturada.py 2026-06` ou `--todos`. |
 | [`3-Py/2-Checks/`](3-Py/2-Checks/) | `check_mr_bloco2.py` compara o mês por opção de compra e subgrupo. `check_mr_camadas.py` compara por família e camada, mês a mês. `consolida_check_mr_bloco2.py` consolida vários meses. `le_mr.py` lê o Mercado Receita (também usado pelos checks do SAMP). `gera_receita_faturada_mr.py` monta o Mercado Receita no layout Receita Faturada e gera o check célula a célula: `python 3-Py/2-Checks/gera_receita_faturada_mr.py 2026-05` ou `--todos`. `gera_receita_faturada_bl1_vs_bl2.py` compara a tarifa homologada com a realizada e separa os descontos: `python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py --todos`. |
+| [`3-Py/readme/tabelas_readme.ipynb`](3-Py/readme/tabelas_readme.ipynb) | Gera as tabelas da seção 5 deste documento a partir do pxq e dos checks. O período de cada tabela e a opção de rodar os checks antes ficam no Passo 0. O texto de leitura continua manual. |
 | `tbl/` | Tabelas do processo: tarifas homologadas, calendário de leitura e o modelo do layout Receita Faturada. |
 | `tbl/calendario/` | `calendario_leitura.csv`: uma linha por mês, grupo e lote, com a data de leitura, os dias de consumo e o início e fim do ciclo. `de_para_lote.csv`: o grupo e o nº do lote do calendário para cada lote do BW (campo `Conjunto de Contrato`), validado pela área do BW. Ambos em csv para facilitar a passagem para a TI. |
 | `tbl/modelo/De-Para_Modelo_PyC.xlsx` | Modelo da área para o layout Receita Faturada: a aba "Receita Faturada" define as colunas e a grade de linhas; a aba "Instruções", o de-para dos itens tarifários para os grupos do layout. Sem ele a Receita Faturada não é gerada. Não tem dados da Enel e é versionado no Git. |
@@ -119,6 +124,8 @@ estão. Por isso os comandos acima rodam a partir de `SP/BW`.
    e rodar `python 3-Py/1-Entrega/gera_calendario_leitura.py <ano>`.
 5. Uma vez por ano, quando sai o Mercado Receita do reajuste, rodar os checks de `3-Py/2-Checks/`,
    inclusive o `gera_receita_faturada_mr.py`, depois do passo 3.
+6. Para atualizar a seção 5 deste documento, rodar `3-Py/readme/tabelas_readme.ipynb` e copiar as
+   tabelas de `2-Checks/tabelas_readme/tabelas_readme.md`.
 
 ### Versões
 
@@ -235,7 +242,7 @@ aparece como "TAR.REDUZIDA RES.ANEEL 166/05".
 - O BW não informa quanto do consumo de cada cliente cai em cada faixa. A participação de cada
   faixa é estimada pela própria receita faturada.
 - No bloco 1, a Tarifa Social fica pela tarifa B1 subclasse Baixa Renda sem a redução; a faixa
-  gratuita estimada é a primeira etapa do bloco 2 e é a estimativa do valor reembolsado (seção 5.5).
+  gratuita estimada é a primeira etapa do bloco 2 e é a estimativa do valor reembolsado (seção 5.4).
   O Desconto Social mantém as faixas no bloco 1.
 
 ### 3.6 Vigência tarifária e tarifa proporcional
@@ -390,13 +397,13 @@ que explica o restante? A resposta é uma conta de chegada, que fecha exatamente
 
 | Item | Unidade | jan | fev | mar | abr | mai | jun | jul | ago |
 |---|---|---|---|---|---|---|---|---|---|
-| (a) Receita faturada (base tarifável) | R$ milhões | 1.940,7 | 1.835,7 | 1.798,1 | 1.943,9 | 1.848,7 | 1.706,7 | 1.812,8 | 1.938,6 |
+| (a) Receita faturada (base tarifável) | R$ milhões | 1.940,7 | 1.835,7 | 1.798,1 | 1.943,8 | 1.848,7 | 1.706,7 | 1.812,8 | 1.938,6 |
 | (b) Bloco 1 (tarifa cheia) | R$ milhões | 2.052,0 | 1.951,6 | 1.911,3 | 2.053,8 | 1.959,3 | 1.816,1 | 1.932,5 | 2.075,2 |
 | (c) Diferença a explicar, (b) − (a) | R$ milhões | 111,3 | 115,9 | 113,2 | 109,9 | 110,6 | 109,4 | 119,7 | 136,6 |
-| (d) Tarifa Social (faixa gratuita) | R$ milhões | −38,8 | −37,1 | −36,0 | −36,1 | −35,7 | −34,8 | −40,6 | −45,5 |
+| (d) Tarifa Social (faixa gratuita) | R$ milhões | −38,8 | −37,1 | −36,0 | −36,1 | −35,7 | −34,8 | −40,5 | −45,5 |
 | (e) Isenção APE | R$ milhões | −9,9 | −16,1 | −14,7 | −9,2 | −11,0 | −13,0 | −13,1 | −16,1 |
 | (f) Fonte incentivada (1ª passada) | R$ milhões | −63,0 | −63,5 | −64,1 | −66,3 | −63,0 | −62,9 | −63,8 | −72,8 |
-| (g) 2ª passada, líquida | R$ milhões | 0,3 | 0,9 | 1,5 | 1,6 | −0,8 | 1,3 | −2,3 | −2,3 |
+| (g) 2ª passada, líquida | R$ milhões | 0,3 | 0,9 | 1,5 | 1,6 | −0,8 | 1,3 | −2,3 | −2,2 |
 | (g1) dela, TUSD Consumo Próprio não faturada por decisão da Empresa | R$ milhões | −1,6 | −1,4 | −0,7 | −0,9 | −2,6 | −0,7 | −0,8 | −3,3 |
 | (g2) dela, demais grupos | R$ milhões | 1,9 | 2,3 | 2,2 | 2,4 | 1,8 | 2,0 | −1,5 | 1,0 |
 | (h) Resíduo sem item tarifário | R$ milhões | 0,0 | 0,0 | 0,1 | 0,1 | 0,0 | 0,0 | 0,1 | 0,0 |
@@ -458,9 +465,13 @@ O que foi conferido:
 
 ### 5.3 Comparação com o Mercado Receita do reajuste, por família e camada
 
-A tabela compara o bloco 2 do P × Q com o Mercado Receita, de janeiro a maio de 2026. O MR de
-junho é projetado e fica fora. A base econômica está aberta por família; CVA e financeiros estão
-totalizados.
+A tabela compara o bloco 2 do P × Q com o Mercado Receita, de janeiro a maio de 2026, o período em
+que o MR do reajuste é a referência mais segura. A base econômica está aberta por família; CVA e
+financeiros estão totalizados.
+
+A comparação cobre só a receita tarifável, aberta por item tarifário. Ficam fora tributos (PIS/COFINS
+e ICMS), bandeiras tarifárias, ultrapassagem de demanda e energia reativa (UD/ER) e os demais
+lançamentos sem tarifa homologada (seção 3.8), que o Mercado Receita não traz.
 
 O subsídio que o Mercado Receita calcula à parte é distribuído pelos itens com o mesmo mecanismo
 do próprio MR (abatimento de quantidade). Assim, os dois lados carregam os descontos dentro dos
@@ -477,42 +488,46 @@ itens. A cobrança direta de ERCAP aos livres fica fora dos dois lados (3.7).
   significa que o P × Q devolve menos que o MR.
 - **Total.** Soma das linhas acima: a receita tarifável inteira.
 
-Diferença = P × Q − Mercado Receita. Valor negativo indica P × Q abaixo do MR.
+Diferença = P × Q − Mercado Receita. Valor negativo indica P × Q abaixo do MR. Nas colunas mensais e no
+Acumulado, cada percentual é calculado sobre o valor do MR da própria linha (por isso uma família
+menor, como o Fio A, tem percentual maior para a mesma diferença em R$). A última coluna divide a
+diferença acumulada de cada linha pela receita total do MR no período (R$ 9.395,9 milhões), o que
+mostra o peso de cada família no desvio total.
 
-| Diferença P × Q − MR | Unidade | jan | fev | mar | abr | mai | Acumulado |
-|---|---|---|---|---|---|---|---|
-| BE · FIO A | % do MR | −3,16 | −0,23 | −0,26 | −0,48 | −0,24 | −0,90 |
-| BE · FIO B | % do MR | −0,64 | −0,48 | −0,45 | −0,71 | −0,41 | −0,54 |
-| BE · ENCARGOS | % do MR | +0,65 | −1,22 | −0,72 | +0,52 | +0,43 | −0,05 |
-| BE · PERDAS | % do MR | 0,00 | −0,03 | −0,01 | −0,19 | −0,01 | −0,05 |
-| BE · ENERGIA | % do MR | −0,14 | −0,18 | −0,18 | −0,47 | −0,21 | −0,24 |
-| BE · RI e OUTROS | % do MR | — | — | — | — | — | — |
-| CVA (total) | % do MR | +2,83 | −2,25 | −1,06 | +2,18 | +1,73 | +0,70 |
-| FIN (total) | % do MR | +1,97 | +1,83 | +1,57 | +1,96 | +1,60 | +1,79 |
-| **Total** | % do MR | **−0,24** | **−0,53** | **−0,38** | **−0,16** | **−0,01** | **−0,26** |
+| Diferença P × Q − MR | Unidade | jan | fev | mar | abr | mai | Acumulado | Acumulado, % da receita do MR |
+|---|---|---|---|---|---|---|---|---|
+| BE · FIO A | % do MR | −2,37 | −0,71 | −0,74 | −0,94 | −0,74 | −1,11 | −0,10 |
+| BE · FIO B | % do MR | −0,74 | −0,70 | −0,69 | −0,93 | −0,67 | −0,75 | −0,21 |
+| BE · ENCARGOS | % do MR | +0,67 | −1,21 | −0,71 | +0,54 | +0,45 | −0,04 | −0,01 |
+| BE · PERDAS | % do MR | +0,01 | −0,02 | 0,00 | −0,18 | 0,00 | −0,04 | 0,00 |
+| BE · ENERGIA | % do MR | −0,06 | −0,11 | −0,10 | −0,34 | −0,12 | −0,15 | −0,04 |
+| BE · RI e OUTROS | % do MR | — | — | — | — | — | — | — |
+| CVA (total) | % do MR | +2,59 | −2,19 | −1,00 | +2,20 | +1,79 | +0,69 | +0,01 |
+| FIN (total) | % do MR | +1,92 | +1,81 | +1,54 | +1,90 | +1,57 | +1,75 | +0,05 |
+| **Total** | % do MR | **−0,17** | **−0,62** | **−0,46** | **−0,22** | **−0,10** | **−0,31** | **−0,31** |
 
 Em valores absolutos:
 
 | Diferença P × Q − MR | Unidade | jan | fev | mar | abr | mai | Acumulado |
 |---|---|---|---|---|---|---|---|
-| BE · FIO A | R$ milhões | −5,7 | −0,4 | −0,4 | −0,9 | −0,4 | −7,8 |
-| BE · FIO B | R$ milhões | −3,5 | −2,4 | −2,3 | −3,8 | −2,1 | −14,1 |
-| BE · ENCARGOS | R$ milhões | 3,7 | −6,7 | −3,8 | 3,0 | 2,4 | −1,5 |
-| BE · PERDAS | R$ milhões | 0,0 | 0,0 | 0,0 | −0,2 | 0,0 | −0,3 |
-| BE · ENERGIA | R$ milhões | −0,8 | −1,0 | −1,0 | −2,7 | −1,1 | −6,7 |
+| BE · FIO A | R$ milhões | −4,3 | −1,2 | −1,2 | −1,7 | −1,3 | −9,7 |
+| BE · FIO B | R$ milhões | −4,0 | −3,6 | −3,4 | −5,0 | −3,5 | −19,5 |
+| BE · ENCARGOS | R$ milhões | 3,8 | −6,6 | −3,8 | 3,1 | 2,4 | −1,1 |
+| BE · PERDAS | R$ milhões | 0,0 | 0,0 | 0,0 | −0,2 | 0,0 | −0,2 |
+| BE · ENERGIA | R$ milhões | −0,3 | −0,6 | −0,5 | −2,0 | −0,6 | −4,1 |
 | BE · RI e OUTROS | R$ milhões | 0,0 | 0,0 | 0,0 | 0,0 | 0,0 | 0,0 |
-| CVA (total) | R$ milhões | 0,4 | −0,4 | −0,2 | 0,4 | 0,3 | 0,6 |
-| FIN (total) | R$ milhões | 1,2 | 1,0 | 0,9 | 1,2 | 0,9 | 5,1 |
-| **Total** | R$ milhões | **−4,7** | **−9,9** | **−6,8** | **−3,1** | **−0,2** | **−24,7** |
+| CVA (total) | R$ milhões | 0,4 | −0,3 | −0,2 | 0,4 | 0,3 | 0,5 |
+| FIN (total) | R$ milhões | 1,1 | 1,0 | 0,8 | 1,1 | 0,9 | 5,0 |
+| **Total** | R$ milhões | **−3,3** | **−11,4** | **−8,3** | **−4,2** | **−1,8** | **−29,0** |
 | Referência: receita do Mercado Receita | R$ milhões | 1.944,0 | 1.847,1 | 1.806,4 | 1.948,0 | 1.850,5 | 9.395,9 |
 
 Leitura:
 
-- **Total.** O P × Q fica a menos de 0,6% do Mercado Receita em todos os meses, e a −0,26% no
+- **Total.** O P × Q fica a menos de 0,7% do Mercado Receita em todos os meses, e a −0,31% no
   acumulado.
 - **CVA e FIN.** Os percentuais são maiores porque as camadas são pequenas. A maior diferença
-  mensal é de R$ 1,2 milhão, menos de 0,1% da receita do mês.
-- **Encargos.** Oscilam em torno de zero (acumulado −0,05%). A isenção APE registrada num mês
+  mensal é de R$ 1,1 milhão, menos de 0,1% da receita do mês.
+- **Encargos.** Oscilam em torno de zero (acumulado −0,04%). A isenção APE registrada num mês
   inclui créditos de meses anteriores, e o BW não permite separá-los.
 - **Fio A de janeiro.** É o único ponto fora do padrão: a demanda dos livres A2 no BW fica abaixo
   da do MR nesse mês. A investigação está registrada em [`sessions.md`](sessions.md).
@@ -521,56 +536,7 @@ Leitura:
 Detalhe completo em `2-Checks/consolidado_check_mr_camadas_2026-01_a_2026-05.xlsx` e, por opção
 de compra e subgrupo, em `2-Checks/consolidado_check_mr_bloco2_2026-01_a_2026-05.xlsx`.
 
-### 5.4 Layout Receita Faturada contra o Mercado Receita
-
-O script `3-Py/2-Checks/gera_receita_faturada_mr.py` monta o Mercado Receita (MR) no mesmo layout da
-Receita Faturada e grava, por mês, as duas versões lado a lado e uma aba `check` com a diferença
-PxQ − MR em cada célula, por fórmula. As linhas são as opções de compra × unidade (D/E), com as
-classes somadas, porque o cadastro de classe do livre difere entre as bases (ver abaixo). A
-abertura por classe é opcional (`--classes`). O consolidado
-(`consolidado_receita_faturada_MR_<ini>_a_<fim>.xlsx`) resume o período com uma linha por mês e marca
-os meses em que o MR é projetado. As premissas da montagem do lado MR estão no
-[procedimento](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md), seção "Check do layout Receita
-Faturada contra o Mercado Receita".
-
-Total do layout, colunas I a AE (R$ milhões):
-
-| | jan | fev | mar | abr | mai | jun | jul | ago |
-|---|---|---|---|---|---|---|---|---|
-| PxQ | 2.519,2 | 2.366,3 | 2.297,5 | 2.483,5 | 2.414,6 | 2.214,0 | 2.362,7 | 2.529,7 |
-| MR | 2.475,3 | 2.359,6 | 2.286,7 | 2.467,3 | 2.377,6 | 2.377,6 | 2.473,9 | 2.525,5 |
-| PxQ − MR | 43,9 | 6,7 | 10,9 | 16,1 | 37,0 | −163,6 | −111,2 | 4,1 |
-
-Leitura:
-
-- **Total.** O MR não tem bandeira, UD/ER e boa parte de Outros; essas colunas aparecem inteiras
-  como diferença, o que explica a maior parte de janeiro e maio. Os MR de junho e julho são
-  projetados (junho repete maio) e não servem de conferência.
-- **Cativo.** Bate; a diferença de 1% a 2% é a bandeira do PxQ. Na abertura por classe, a
-  Residencial Baixa Renda fecha em maio (R$ 72,2 milhões no PxQ, R$ 72,1 milhões no MR, sem
-  tributos).
-- **As classes do livre são diferentes no MR e no BW.** O volume total do livre é praticamente o
-  mesmo nas duas bases, mas a divisão por classe não:
-
-  | Livre, maio/2026 | PxQ (BW) | MR |
-  |---|---|---|
-  | Energia, Industrial (MWh) | 543.906 | 1.316.559 |
-  | Energia, Comercial (MWh) | 716.438 | 25.043 |
-  | Energia, Serviços Públicos (MWh) | 155.893 | 83.578 |
-  | Energia, demais classes (MWh) | 8.611 | 0 |
-  | **Energia, total (MWh)** | **1.424.848** | **1.425.180** |
-  | Valor sem tributos, Industrial (R$ milhões) | 88,9 | 219,9 |
-  | Valor sem tributos, Comercial (R$ milhões) | 133,0 | 4,2 |
-
-  O MR coloca quase todo o livre em Industrial; o BW tem a maior parte em Comercial. É diferença de
-  cadastro da classe do cliente entre as bases, e não de tarifa. Por isso o check, por padrão, não
-  abre por classe. Pendência registrada em [`sessions.md`](sessions.md), P21.
-- **Consumo Próprio.** Mesma energia nas duas bases (7.237 MWh em maio), mas o MR vale o dobro
-  (R$ 5,2 milhões contra R$ 2,6 milhões). O MR valoriza pela TUSD + TE; a Empresa não fatura a TUSD
-  do seu consumo próprio (seção 5.1, linha g1).
-- **Geração.** R$ 0,4 milhão no MR contra R$ 3,3 milhões no PxQ em maio.
-
-### 5.5 Tarifa homologada × tarifa realizada: onde estão os descontos
+### 5.4 Tarifa homologada × tarifa realizada: onde estão os descontos
 
 O script `3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py` monta o layout Receita Faturada pelo
 bloco 1 (tarifa homologada sem os descontos) e pelo bloco 2 (tarifa realizada, a entrega) e separa a
@@ -677,17 +643,3 @@ Um campo na extração do BW que identifique a instalação no SCEE e a modalida
 ou o encontro de contas da SCEE separado do faturamento bruto. Com ele, cada lançamento do BW é
 classificado na origem, e o conversor passa a gravar as linhas SCEE com o valor faturado. O pedido
 está registrado em [`sessions.md`](sessions.md), item I4.
-
-### 6.2 Nova fonte do SD e abertura estimada da CERIS
-
-A planilha de geradoras, suprimentos e uso da distribuição (SD) será substituída por um arquivo da
-área com receita, tributos, consumo e demanda por agente e mês de competência, a mesma base do
-informe de gestão. Com ele, a diferença que hoje sobra no SD contra o informe (R$ 3,2 milhões em
-janeiro e R$ 0,3 milhão em agosto) desaparece. A adaptação aguarda a separação de demanda e energia
-em ponta e fora ponta, já pedida à área.
-
-A divisão da receita da CERIS entre os itens tarifários será estimada: a energia TE é a sobra da
-receita depois da TUSD, aberta pela composição da TE da CERIS. O total da CERIS fica exato; a
-estimativa não impacta o resultado final, porque a CERIS soma cerca de R$ 9 milhões por ano (0,03%
-da receita). Regras no [procedimento](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md), Passo 14;
-pendência P23 em [`sessions.md`](sessions.md).
