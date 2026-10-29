@@ -580,10 +580,12 @@ O notebook grava também `1-Entrega/pxq_regulacao/PxQ_regulacao_<ref>.xlsx`, par
 Regulação, que precisa da abertura nas camadas da tarifa e não só na tarifa de aplicação.
 
 - **Linhas:** as mesmas da aba `Componentes` (BW tarifável, não tarifáveis e SD), numa aba só.
-- **Colunas, nesta ordem:** identificação do BW; quantidades (consumo TUSD e TE como vêm do BW,
-  demanda, totais, `Energia com TUSD` e `Energia com TE`); receita; a entrega (bloco 2) item a item
+- **Colunas, nesta ordem:** identificação do BW; quantidades (`Energia com TUSD (kWh)`, `Energia com
+  TE (kWh)` e `Demanda (kW)`); receita; a entrega (bloco 2) item a item
   na base econômica (`BE <item>`), na CVA (`CVA <item>`) e nos financeiros (`FIN <item>`).
-- **Fora:** bloco 1, colunas de ajuste e de regime, valor calculado e diferença. Sem painéis
+- **Fora:** bloco 1, colunas de ajuste e de regime, valor calculado e diferença, e as colunas de
+  consumo como vêm do BW (`Consumo TUSD`, `Consumo TE`) e os totais, que confundiam a leitura: no
+  cativo o BW lança a energia só na TE. Sem painéis
   congelados (como no pxq).
 - **Conferências:** a receita é a mesma da aba `Componentes`, e BE + CVA + FIN reproduz a TA do bloco 2
   em cada linha. Uma linha aberta só na TA, sem camadas, fica com os itens zerados e o notebook avisa
