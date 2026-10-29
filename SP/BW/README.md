@@ -374,6 +374,12 @@ que explica o restante? A resposta é uma conta de chegada, que fecha exatamente
   processo.
 - **(h) Resíduo sem item tarifário.** Receita de grupos cujo bloco 1 é zero: sem item tarifário para
   escalar, ela fica fora da abertura e é informada à parte.
+  - **(g1) dela, TUSD Consumo Próprio não faturada por decisão da Empresa.** A Empresa não fatura a
+    TUSD do seu consumo próprio, que vira despesa da companhia; só a TE é faturada. O PxQ valoriza
+    esse consumo pela TUSD + TE, porque ele é informado à ANEEL como faturamento, e a TUSD não
+    faturada aparece aqui. Parte das instalações de consumo próprio paga TUSD, por isso o valor é
+    menor que toda a TUSD do consumo próprio no bloco 1.
+  - **(g2) dela, demais grupos.** (g) − (g1).
 - **(i) 2ª passada, bruta.** Soma dos valores absolutos da 2ª passada de todos os grupos. Mostra se
   o resultado líquido pequeno esconde ajustes grandes de sinais opostos.
 
@@ -388,6 +394,8 @@ que explica o restante? A resposta é uma conta de chegada, que fecha exatamente
 | (e) Isenção APE | R$ milhões | −9,9 | −16,1 | −14,7 | −9,2 | −11,0 | −13,0 | −13,1 | −16,1 |
 | (f) Fonte incentivada (1ª passada) | R$ milhões | −63,0 | −63,5 | −64,1 | −66,3 | −63,0 | −62,9 | −63,8 | −72,8 |
 | (g) 2ª passada, líquida | R$ milhões | 0,3 | 0,9 | 1,5 | 1,6 | −0,8 | 1,3 | −2,3 | −2,3 |
+| (g1) dela, TUSD Consumo Próprio não faturada por decisão da Empresa | R$ milhões | −1,6 | −1,4 | −0,7 | −0,9 | −2,6 | −0,7 | −0,8 | −3,3 |
+| (g2) dela, demais grupos | R$ milhões | 1,9 | 2,3 | 2,2 | 2,4 | 1,8 | 2,0 | −1,5 | 1,0 |
 | (h) Resíduo sem item tarifário | R$ milhões | 0,0 | 0,0 | 0,1 | 0,1 | 0,0 | 0,0 | 0,1 | 0,0 |
 | (i) 2ª passada, bruta | R$ milhões | 3,7 | 7,9 | 3,4 | 4,0 | 4,6 | 3,0 | 5,7 | 7,9 |
 
@@ -400,6 +408,8 @@ que explica o restante? A resposta é uma conta de chegada, que fecha exatamente
 | (e) Isenção APE | % de (a) | −0,51 | −0,88 | −0,82 | −0,47 | −0,60 | −0,76 | −0,72 | −0,83 |
 | (f) Fonte incentivada (1ª passada) | % de (a) | −3,25 | −3,46 | −3,56 | −3,41 | −3,41 | −3,69 | −3,52 | −3,76 |
 | (g) 2ª passada, líquida | % de (a) | +0,02 | +0,05 | +0,08 | +0,08 | −0,04 | +0,07 | −0,13 | −0,12 |
+| (g1) dela, TUSD Consumo Próprio não faturada | % de (a) | −0,08 | −0,08 | −0,04 | −0,04 | −0,14 | −0,04 | −0,04 | −0,17 |
+| (g2) dela, demais grupos | % de (a) | +0,10 | +0,12 | +0,12 | +0,12 | +0,10 | +0,12 | −0,08 | +0,05 |
 | (h) Resíduo sem item tarifário | % de (a) | 0,00 | 0,00 | 0,00 | 0,01 | 0,00 | 0,00 | 0,00 | 0,00 |
 | (i) 2ª passada, bruta | % de (a) | 0,19 | 0,43 | 0,19 | 0,21 | 0,25 | 0,18 | 0,32 | 0,41 |
 
@@ -413,8 +423,15 @@ que explica o restante? A resposta é uma conta de chegada, que fecha exatamente
 - Julho e agosto são os meses com tarifa proporcional, calculada pelo ciclo de leitura de cada lote
   (3.6). A 2ª passada bruta fica em 0,32% e 0,41%. Com o método anterior, que estimava o peso de
   cada vigência pela receita, ela era de 0,52% e 0,51%.
-- Em agosto, cerca de R$ 2,3 milhões da 2ª passada vêm de lançamentos de B3 cativo faturados só com
-  TE, sem a TUSD, nos lotes centro_02_bt e abc_02_bt (pendência P25 em [`sessions.md`](sessions.md)).
+- A maior parte negativa da 2ª passada é a TUSD do consumo próprio, não faturada por decisão da
+  Empresa (g1): de 0,7 a 3,3 milhões por mês. Os meses com mais consumo próprio (maio e agosto) são
+  os de faturamento acumulado de várias referências. Sem ela, a 2ª passada dos demais grupos (g2) é
+  positiva e estável, entre 0,10% e 0,12% da receita, exceto em julho, mês do reajuste.
+- O notebook não separa (g1): a 2ª passada fecha o consumo próprio na receita do BW, distribuindo a
+  TUSD não faturada entre todos os itens do grupo, TUSD e TE. No bloco 2, o consumo próprio fica na
+  receita do BW, com a TE um pouco abaixo do que foi efetivamente cobrado. Por isso o PxQ fica igual
+  ao informe de gestão, e não acima dele pela TUSD não faturada, como seria na visão informada à
+  ANEEL.
 
 ### 5.2 Validações
 
@@ -546,7 +563,8 @@ Leitura:
   cadastro da classe do cliente entre as bases, e não de tarifa. Por isso o check, por padrão, não
   abre por classe. Pendência registrada em [`sessions.md`](sessions.md), P21.
 - **Consumo Próprio.** Mesma energia nas duas bases (7.237 MWh em maio), mas o MR vale o dobro
-  (R$ 5,2 milhões contra R$ 2,6 milhões). Pendência P22.
+  (R$ 5,2 milhões contra R$ 2,6 milhões). O MR valoriza pela TUSD + TE; a Empresa não fatura a TUSD
+  do seu consumo próprio (seção 5.1, linha g1).
 - **Geração.** R$ 0,4 milhão no MR contra R$ 3,3 milhões no PxQ em maio.
 
 ### 5.5 Tarifa homologada × tarifa realizada: onde estão os descontos
@@ -567,6 +585,8 @@ Diferença tarifa homologada − tarifa realizada (R$ milhões; positivo = desco
 | APE | 9,9 | 16,1 | 14,7 | 9,2 | 11,0 | 13,0 | 13,1 | 16,1 |
 | Fonte incentivada | 63,0 | 63,5 | 64,1 | 66,3 | 63,0 | 62,9 | 63,8 | 72,8 |
 | 2ª passada | −0,3 | −0,9 | −1,5 | −1,6 | 0,8 | −1,3 | 2,3 | 2,2 |
+| dela, TUSD Consumo Próprio não faturada | 1,6 | 1,4 | 0,7 | 0,9 | 2,6 | 0,7 | 0,8 | 3,3 |
+| dela, demais grupos | −1,9 | −2,3 | −2,2 | −2,4 | −1,8 | −2,0 | 1,5 | −1,0 |
 | **Total** | **111,4** | **115,9** | **113,3** | **110,1** | **110,6** | **109,4** | **119,8** | **136,7** |
 
 O total é a linha (c) da seção 5.1, a menos do resíduo; Tarifa Social – DMR mais SCEE - Baixa
@@ -591,9 +611,8 @@ Leitura:
 - **Fora do check.** Desconto Social, isenção de encargos da Baixa Renda e as tarifas próprias das
   subclasses ficam no bloco 1 e não aparecem na diferença: não são reembolsados pela CDE.
 - **Consumo Próprio.** A 2ª passada do Consumo Próprio cativo é de R$ 2,6 milhões em maio: a tarifa
-  cheia dá R$ 5,2 milhões e o faturado é R$ 2,6 milhões. A tarifa homologada é o valor do Mercado
-  Receita (seção 5.4), o que indica que o faturamento cobra cerca de metade da tarifa no consumo
-  próprio. Pendência P22.
+  cheia dá R$ 5,2 milhões e o faturado é R$ 2,6 milhões. A diferença é a TUSD, que a Empresa não
+  fatura no seu consumo próprio; só a TE é faturada (seção 5.1, linha g1).
 
 ## 6. Pendências
 
