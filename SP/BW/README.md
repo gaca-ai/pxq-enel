@@ -127,7 +127,8 @@ O desenvolvimento segue no branch `main`. As versões fechadas ficam marcadas po
 | Tag | Versão |
 |---|---|
 | `vf-base1-antes-acrescimo-novas-colunas` | Versão final para a extração do BW em Excel (`Receita de Fornecimento Jan a Ago-26 com subclasse.xlsx`), de janeiro a agosto de 2026, antes da base em parquet com as colunas novas: data de leitura e de faturamento, indicador e referência original do refaturamento e identificação do TOI. |
-| `vf-base2-tarifa-proporcional-lote` | Versão final com a base do BW em csv/parquet (lote, referência original e indicador de refaturamento), tipos de faturamento FAT/REFAT/CNR, Tarifa Social no bloco 1 e tarifa proporcional pelo ciclo de leitura do lote. Jan a set/2026. |
+| `VERSAO-FINAL` | Versão final com a base do BW em csv/parquet (lote, referência original e indicador de refaturamento), tipos de faturamento FAT/REFAT/CNR, Tarifa Social no bloco 1 e tarifa proporcional pelo ciclo de leitura do lote. Jan a set/2026. |
+| `VF-com-PxQ-Regulacao` | Versão com a saída para a Regulação (`PxQ_regulacao_<ref>.xlsx`: entrega aberta em BE, CVA e FIN), as colunas `Energia com TUSD` e `Energia com TE`, a TE de suprimento da Ceris completada nas vigências 2024 e 2025 e a TUSD do Consumo Próprio separada da 2ª passada na documentação. Jan a set/2026. |
 
 Para consultar uma versão: no GitHub Desktop, aba **History**, o commit marcado com a tag; no
 GitHub, **Tags**, onde o código daquela versão pode ser baixado.
