@@ -50,8 +50,8 @@ Todo mês muda só `REFERENCIA` (`aaaa-mm`). Os arquivos são localizados pelo p
 | Arquivo | Pasta | Para que serve |
 |---|---|---|
 | `RNF CCS <mmaaaa> Fator K Nova Metodologia.xlsb` | `src/` | Fonte do ZUBIL_146 (só a aba `Relatório SAP_ZUBIL_146` é lida) |
-| `BASE_ESTIMADO_RNF_POR_CLUSTER_<aaaamm>.xlsx` | `src/` | Ajustes manuais e alíquotas de PIS e COFINS |
-| `SP_Consolidacao Margem_<aaaa>.<mm>.xlsx` | `src/` | Valor de comparação (aba `Base RNF`) |
+| `BASE_RNF_MANUAIS_<aaaamm>.xlsx` | `src/` | Ajustes manuais e alíquotas de PIS e COFINS |
+| `SP_Consolidacao Margem_<aaaa>.<mm>.xlsx` | `src/` | Valor de comparação (aba `Base RNF`). Opcional: sem ele, a conciliação do Passo 11 não é feita |
 | `tarifa_long.csv` | `../BW/tbl/tarifas/` | Tabela de tarifas homologadas, única para Faturamento e RNF |
 | `pxq_<aaaa-mm>.xlsx` | `../BW/1-Entrega/pxq/` | P × Q do Faturamento do mesmo mês (composição do faturado, Passo 9) |
 
@@ -109,8 +109,13 @@ mapeada.
 
 ## Passo 4 — Ajustes manuais
 
-Os ajustes vêm da base no formato novo. É usado tudo o que não é o cluster `Sistema`, que é a própria
-RNF do SAP e já foi lida do ZUBIL.
+Os ajustes vêm da base no formato novo (aba `Base_Dados`), com uma linha por cluster e atributos
+tarifários. Se a base trouxer o cluster `Sistema` (a RNF do SAP), ele não entra no cálculo, porque a
+RNF do SAP já foi lida do ZUBIL; serve só para a conferência 4 do Passo 10.
+
+Linhas sem cluster são descartadas quando estão em branco ou quando são uma linha de total (todos os
+valores iguais ao total das colunas), com aviso. Qualquer outra linha sem cluster e com valor
+interrompe o processo, para não somar por engano um quadro auxiliar colocado na aba.
 
 | Cluster | Origem | Tratamento |
 |---|---|---|
@@ -200,7 +205,8 @@ Linha com bloco 1 zero e valor registrado fica como resíduo, informado à parte
 2. TA = BE + CVA + FIN no bloco 2.
 3. Famílias = componentes.
 4. ZUBIL × cluster `Sistema` da base de ajustes: energia, valor com tributos e valor líquido por
-   mercado devem ser iguais (a base de ajustes também traz o `Sistema`, calculado do ZUBIL).
+   mercado devem ser iguais. Só quando a base traz o cluster `Sistema`; sem ele, a conferência é
+   informada como não aplicável.
 5. Medida, não aprovação: valor líquido ÷ bloco 1 por subgrupo e modalidade no rateio proporcional.
 
 A planilha só deve ser usada se as conferências 1 a 4 passarem.
@@ -221,7 +227,8 @@ da margem, bloco a bloco:
 | Total Livres | coluna W do ZUBIL + cluster `Ajuste Livre` |
 
 A `Base RNF` classifica o valor da demanda do livre (colunas S e U) como cativo; a abertura o trata
-como livre. Por isso a comparação usa o agrupamento da `Base RNF`.
+como livre. Por isso a comparação usa o agrupamento da `Base RNF`. Sem a consolidação do mês em
+`src/`, a abertura é apresentada nos mesmos blocos, sem a comparação.
 
 ## Passo 12 — Base no layout Receita Faturada
 
@@ -274,14 +281,18 @@ mesmo layout e unidade da `receita_faturada` (R$ mil; quantidade em MWh ou MW):
 | `Saldo_YTD` | provisão − provisão de dezembro do ano anterior (quando houver) |
 | `Conferencia` | total gravado + fora do layout = total da RNF |
 
-Sem a saída do mês anterior, as abas `Estorno` e `Saldo` trazem um aviso em vez de dados.
+Sem a saída do mês anterior, as abas `Estorno` e `Saldo` trazem um aviso em vez de dados. As colunas
+UD/ER e Outros, que não existem no modelo da área, são inseridas antes de PIS/COFINS, como no
+Faturamento; elas e a coluna Total recebem o formato das demais colunas de valor.
 
 ---
 
 ## Rotina mensal
 
 1. Rodar o P × Q do Faturamento do mês (`SP/BW`).
-2. Colocar em `src/` o relatório da RNF do mês (fonte do ZUBIL), a base de ajustes manuais e a
-   consolidação da margem.
+2. Colocar em `src/` o relatório da RNF do mês (fonte do ZUBIL), a base de ajustes manuais
+   (`BASE_RNF_MANUAIS_<aaaamm>.xlsx`) e a consolidação da margem.
 3. Ajustar `REFERENCIA` no Passo 1 e executar o notebook.
-4. Verificar a mensagem "TODAS AS CONFERENCIAS PASSARAM" e a diferença com a `Base RNF`.
+4. Verificar a mensagem "TODAS AS CONFERENCIAS PASSARAM" e a diferença com a `Base RNF`. Uma
+   diferença concentrada num bloco de ajuste manual indica divergência de volume entre a base de
+   ajustes e o relatório contábil: comparar a energia por classe das duas fontes.

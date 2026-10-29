@@ -66,7 +66,7 @@ SP/RNF/
 | `1-Entrega/receita_nao_faturada/receita_nao_faturada_<ref>.xlsx` | Consolidado no layout Receita Faturada (R$ mil): `Provisao`, `Estorno`, `Saldo`, `Saldo_YTD` e `Conferencia`. |
 | [`1-Entrega/procedimentos/PROCEDIMENTO_RNF.md`](1-Entrega/procedimentos/PROCEDIMENTO_RNF.md) | O que cada passo do notebook faz e por quê. |
 | [`3-Py/2-Checks/extrai_zubil_colunas.py`](3-Py/2-Checks/extrai_zubil_colunas.py) | Grava o ZUBIL do mês só com as colunas usadas (`2-Checks/zubil/`): `python 3-Py/2-Checks/extrai_zubil_colunas.py 2026-08`. |
-| `src/` | Relatório mensal da RNF (`RNF CCS <mmaaaa> ... .xlsb`, fonte da aba do ZUBIL_146), base de ajustes manuais (`BASE_ESTIMADO_RNF_POR_CLUSTER_<aaaamm>.xlsx`) e consolidação da margem (`SP_Consolidacao Margem_<aaaa>.<mm>.xlsx`, aba `Base RNF`). |
+| `src/` | Relatório mensal da RNF (`RNF CCS <mmaaaa> ... .xlsb`, fonte da aba do ZUBIL_146), base de ajustes manuais (`BASE_RNF_MANUAIS_<aaaamm>.xlsx`) e consolidação da margem (`SP_Consolidacao Margem_<aaaa>.<mm>.xlsx`, aba `Base RNF`; opcional: sem ela, a abertura sai sem a conciliação). |
 | `../BW/tbl/tarifas/tarifa_long.csv` | Tabela de tarifas homologadas, compartilhada com o Faturamento. |
 | `../BW/1-Entrega/pxq/pxq_<ref>.xlsx` | P × Q do Faturamento do mesmo mês: composição do faturado do grupo A (ponta e demanda). |
 | `../BW/tbl/modelo/De-Para_Modelo_PyC.xlsx` e `../BW/3-Py/1-Entrega/gera_receita_faturada.py` | Modelo e de-para do layout Receita Faturada, os mesmos do Faturamento. |
@@ -156,7 +156,7 @@ O notebook percorre as etapas abaixo. O porquê de cada uma está no
 
 ## 5. Resultados obtidos
 
-Agosto de 2026.
+Agosto e setembro de 2026, rodados em sequência (setembro estorna agosto).
 
 ### 5.1 Do valor pela tarifa ao valor registrado
 
@@ -165,16 +165,20 @@ Agosto de 2026.
                      + (f) 2ª passada + (g) resíduo
 ```
 
-| Item | MR$ |
-|---|---:|
-| (a) RNF registrada, líquida de PIS/COFINS (base tarifável) | 1.716,31 |
-| (b) Bloco 1: quantidade × tarifa cheia | 1.654,82 |
-| (c) Diferença a explicar, (b) − (a) | −61,50 |
-| (d) Aplicação do desconto na demanda do livre | −10,35 |
-| (e) Composição do faturado: energia de ponta e demanda do grupo A | 72,04 |
-| (f) 2ª passada, líquida | −0,19 |
-| (g) Resíduo sem item tarifário | 0,00 |
-| (h) 2ª passada, bruta | 8,39 |
+| Item | ago | set |
+|---|---:|---:|
+| (a) RNF registrada, líquida de PIS/COFINS (base tarifável) | 1.716,31 | 1.661,72 |
+| (b) Bloco 1: quantidade × tarifa cheia | 1.654,82 | 1.599,42 |
+| (c) Diferença a explicar, (b) − (a) | −61,50 | −62,29 |
+| (d) Aplicação do desconto na demanda do livre | −10,35 | −8,12 |
+| (e) Composição do faturado: energia de ponta e demanda do grupo A | 72,04 | 70,15 |
+| (e1) dela, livre | 55,44 | 52,97 |
+| (e2) dela, cativo | 16,60 | 17,18 |
+| (f) 2ª passada, líquida | −0,19 | 0,27 |
+| (g) Resíduo sem item tarifário | 0,00 | 0,00 |
+| (h) 2ª passada, bruta | 8,39 | 8,62 |
+
+MR$.
 
 **O que é cada linha**
 
@@ -185,56 +189,86 @@ Agosto de 2026.
   bloco 1, porque contém a energia de ponta e demanda que a quantidade não traz.
 - **(d)** A demanda do livre valorizada pela tarifa cheia menos o valor registrado: o desconto de
   fonte incentivada e APE.
-- **(e)** Livre MR$ 55,44 e cativo MR$ 16,60: energia de ponta (relevante no Verde) e demanda não
-  informada (relevante no Azul), abertas pela composição do faturado do mês.
+- **(e)** Energia de ponta (relevante no Verde) e demanda não informada (relevante no Azul), abertas
+  pela composição do faturado do mês.
 - **(f) e (h)** Rateio proporcional das demais linhas, com sinal e em módulo. Vem dos ajustes manuais,
   valorizados pela tarifa média de cada classe; da iluminação pública (B4a e B4b não separadas); e da
   Branca (sem posto).
 
 **Leitura:** depois de tratados a demanda e os postos horários, a 2ª passada líquida é praticamente
-zero. A composição por item vem da tarifa e do faturado, não do rateio.
+zero nos dois meses. A composição por item vem da tarifa e do faturado, não do rateio.
 
 ### 5.2 Conciliação com a `Base RNF`
 
-| Bloco | `Base RNF` (MR$) | Abertura (MR$) | Diferença (MR$) |
-|---|---:|---:|---:|
-| Consumo Cativo | 1.065,51 | 1.065,51 | 0,00 |
-| TOI | 72,07 | 72,31 | 0,24 |
-| Pendentes | 293,38 | 293,29 | −0,10 |
-| Artigo 113 | 95,95 | 95,86 | −0,08 |
-| Carga | 26,45 | 26,45 | 0,00 |
-| Bandeira | 33,85 | 33,85 | 0,00 |
-| Total Livres | 262,29 | 262,29 | 0,00 |
-| **Total** | **1.849,50** | **1.849,56** | **0,06** |
+| Bloco | ago `Base RNF` | ago PxQ RNF | ago dif. | set `Base RNF` | set PxQ RNF | set dif. |
+|---|---:|---:|---:|---:|---:|---:|
+| Consumo Cativo | 1.065,51 | 1.065,51 | 0,00 | 1.003,62 | 1.003,62 | 0,00 |
+| TOI | 72,07 | 72,31 | 0,24 | 73,64 | 73,84 | 0,20 |
+| Pendentes | 293,38 | 293,29 | −0,10 | 305,32 | 305,29 | −0,03 |
+| Artigo 113 | 95,95 | 95,86 | −0,08 | 106,96 | 106,85 | −0,10 |
+| Carga | 26,45 | 26,45 | 0,00 | 21,58 | 21,58 | 0,00 |
+| Bandeira | 33,85 | 33,85 | 0,00 | 32,91 | 32,91 | 0,00 |
+| Total Livres | 262,29 | 262,29 | 0,00 | 249,34 | 249,34 | 0,00 |
+| **Total** | **1.849,50** | **1.849,56** | **0,06** | **1.793,38** | **1.793,44** | **0,07** |
 
-Composição do total aberto: valor por item MR$ 1.716,31 + PIS/COFINS 91,82 + reativo 7,58 + bandeira
-33,85. A diferença de MR$ 0,06 vem da distribuição por classe do TOI, das faturas pendentes e do
-art. 323 na base de ajustes, diferente da usada na `Base RNF`.
+MR$, com PIS/COFINS. Composição do total do PxQ RNF:
+
+| Item | ago | set |
+|---|---:|---:|
+| Valor aberto por item (líquido) | 1.716,31 | 1.661,72 |
+| PIS/COFINS | 91,82 | 91,73 |
+| Reativo | 7,58 | 7,09 |
+| Bandeira | 33,85 | 32,91 |
+| **Total** | **1.849,56** | **1.793,44** |
+
+A diferença que sobra vem da distribuição por classe do TOI, das faturas pendentes e do art. 323 na
+base de ajustes, diferente da usada na `Base RNF`. O SAP, a carga, a bandeira e os livres fecham
+exatamente.
 
 ### 5.3 Abertura por família e camada
 
-| Família | Cativo | Livre | Total | % do total |
-|---|---:|---:|---:|---:|
-| FIO A | 129,33 | 34,37 | 163,70 | 9,5% |
-| FIO B | 382,40 | 30,86 | 413,27 | 24,1% |
-| ENCARGOS | 352,65 | 185,92 | 538,56 | 31,4% |
-| PERDAS | 88,73 | 19,32 | 108,05 | 6,3% |
-| ENERGIA | 511,09 | 0,00 | 511,09 | 29,8% |
-| OUTROS | −15,18 | −3,18 | −18,36 | −1,1% |
-| **Total** | **1.449,03** | **267,28** | **1.716,31** | **100,0%** |
+| Família | ago cativo | ago livre | ago total | set cativo | set livre | set total |
+|---|---:|---:|---:|---:|---:|---:|
+| FIO A | 129,33 | 34,37 | 163,70 | 125,36 | 30,97 | 156,32 |
+| FIO B | 382,40 | 30,86 | 413,27 | 371,98 | 28,51 | 400,49 |
+| ENCARGOS | 352,65 | 185,92 | 538,56 | 343,91 | 175,89 | 519,81 |
+| PERDAS | 88,73 | 19,32 | 108,05 | 86,45 | 18,29 | 104,74 |
+| ENERGIA | 511,09 | 0,00 | 511,09 | 498,12 | 0,00 | 498,12 |
+| OUTROS | −15,18 | −3,18 | −18,36 | −14,78 | −2,98 | −17,76 |
+| **Total** | **1.449,03** | **267,28** | **1.716,31** | **1.411,04** | **250,68** | **1.661,72** |
 
-| Camada | MR$ | % do total |
+| Camada | ago | set |
 |---|---:|---:|
-| BE | 1.647,25 | 96,0% |
-| CVA | 105,08 | 6,1% |
-| FIN | −36,02 | −2,1% |
+| BE | 1.647,25 | 1.594,86 |
+| CVA | 105,08 | 101,85 |
+| FIN | −36,02 | −34,99 |
 
-Bloco 2, tarifa de aplicação, líquido de PIS/COFINS.
+Bloco 2, tarifa de aplicação, líquido de PIS/COFINS, MR$.
 
-### 5.4 Validações
+### 5.4 Efeito na receita: provisão, estorno e saldo (setembro)
 
-Todas as conferências internas passaram: bloco 2 igual ao valor líquido em todas as linhas;
-TA = BE + CVA + FIN; famílias = componentes; ZUBIL igual ao cluster `Sistema` da base de ajustes
-(energia e valor). O layout `receita_nao_faturada` grava o total da RNF (MR$ 1.849,56) sem valor fora
-do layout. Provisão, estorno, saldo e saldo YTD foram testados com meses simulados: estorno igual à
-provisão com sinal trocado, saldo e YTD zero.
+| Item | MR$ |
+|---|---:|
+| Provisão de setembro | 1.793,44 |
+| Estorno da provisão de agosto | −1.849,56 |
+| **Saldo: efeito da RNF na receita de setembro** | **−56,12** |
+
+| Família | Saldo (MR$) |
+|---|---:|
+| FIO A | −7,38 |
+| FIO B | −12,78 |
+| ENCARGOS | −18,76 |
+| PERDAS | −3,31 |
+| ENERGIA | −12,97 |
+| OUTROS | 0,60 |
+| Não tarifáveis (PIS/COFINS, reativo, bandeira) | −1,53 |
+| **Total** | **−56,12** |
+
+O saldo é −38,75 no cativo e −17,37 no livre. O `Saldo_YTD` (contra dezembro de 2025) será gerado
+quando a RNF de dezembro de 2025 for processada.
+
+### 5.5 Validações
+
+Todas as conferências internas passaram nos dois meses: bloco 2 igual ao valor líquido em todas as
+linhas; TA = BE + CVA + FIN; famílias = componentes. O layout `receita_nao_faturada` grava o total da
+RNF sem valor fora do layout, e o estorno de setembro é igual à provisão de agosto com sinal trocado.
