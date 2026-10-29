@@ -1,40 +1,42 @@
 # RNF — Abertura da Renda Não Faturada por item tarifário (Enel Distribuição São Paulo)
 
 Este documento é o ponto de entrada da fase II do projeto P × Q. Ele explica o problema, o que foi
-construído, onde está cada peça e quais resultados foram obtidos. As decisões e as pendências com as
-áreas ficam em [`sessions.md`](sessions.md). As regras tarifárias comuns às duas fases estão no
+entregue, onde está cada peça e quais resultados foram obtidos. O detalhamento de cada transformação
+está no [procedimento](1-Entrega/procedimentos/PROCEDIMENTO_RNF.md). As decisões e as pendências com
+as áreas ficam em [`sessions.md`](sessions.md). As regras tarifárias comuns às duas fases estão no
 [README do Faturamento](../BW/README.md), seção 3, e não são repetidas aqui.
+
+Valores monetários em milhões de reais (MR$), energia em MWh e demanda em MW.
 
 ---
 
 ## 0. Contexto geral
 
 A RNF (Renda Não Faturada) é a receita da energia já entregue e ainda não faturada no fechamento do
-mês: o consumo entre a última leitura de cada cliente e o último dia do mês. Ela é reconhecida pelo
-regime de competência e revertida no mês seguinte, quando a conta é emitida.
+mês. Ela é reconhecida pelo regime de competência: provisionada no mês e estornada no mês seguinte,
+quando a conta é emitida. O efeito na receita do mês é a provisão do mês menos o estorno da provisão
+do mês anterior; no acumulado do ano, a provisão do mês menos a provisão de dezembro do ano anterior.
 
-A contabilidade apura a RNF em um relatório mensal (`RNF CCS <mmaaaa> Fator K Nova
-Metodologia.xlsb`). A maior parte vem do SAP (transação ZUBIL_146, que calcula a RNF de cada lote,
-classe e categoria tarifária); o restante vem de ajustes manuais (faturas pendentes, art. 323, TOI,
-iluminação pública, ajuste de carga), valorizados pela tarifa média do ZUBIL de cada classe. O
-resultado é um valor total, sem a composição tarifária.
+A RNF do sistema é calculada pelo SAP na transação ZUBIL_146, por lote, classe/subclasse e categoria
+tarifária. A contabilidade a completa com ajustes calculados fora do SAP: TOI, faturas pendentes,
+art. 323, iluminação pública, ajuste de carga e ajuste dos livres. O resultado é um valor total, sem
+a composição tarifária.
 
-Na fase I, o P × Q passou a abrir a receita **faturada** nos 37 itens da tarifa. Sem a RNF, a receita
-do mês por item fica incompleta: o que entra numa competência e é revertido na seguinte não tem
-abertura.
+Na fase I, o P × Q abriu a receita **faturada** nos 37 itens da tarifa. Sem a RNF, a receita do mês
+por item fica incompleta: o que entra numa competência e é estornado na seguinte não tem abertura.
 
 ## 1. Objetivo
 
-Produzir, todo mês, a **abertura da RNF contabilizada por item tarifário, família e camada**, com três
+Produzir, todo mês, a **abertura da RNF por item tarifário, família e camada**, com três
 características:
 
-- **Fecha com o relatório contábil.** O valor aberto, somado ao PIS/COFINS, ao reativo e à bandeira,
-  é igual ao total do relatório.
+- **Fecha com a RNF registrada.** O valor aberto, somado ao PIS/COFINS, ao reativo e à bandeira, é
+  igual ao total da RNF do mês.
 - **Mesma régua do Faturamento.** Mesma tabela de tarifas homologadas, mesmos 37 itens, mesmas sete
   famílias e as quatro camadas (TA = BE + CVA + FIN). Faturamento e RNF somam item a item.
-- **Mesma regra de ajuste do Faturamento.** O bloco 1 (quantidade × tarifa) é levado ao valor
-  registrado pela mesma lógica do bloco 2 do BW: regime fio para o livre do grupo A, rateio
-  proporcional para o restante.
+- **Mesma lógica de entrega.** Um relatório detalhado, com toda a abertura tarifária, e um
+  consolidado no layout **Receita Faturada** da área (`receita_nao_faturada`), com provisão, estorno
+  e saldo.
 
 ## 2. Estrutura do projeto
 
@@ -43,32 +45,44 @@ SP/RNF/
 ├── README.md                     este documento
 ├── sessions.md                   ata: decisões tomadas e pendências com as áreas
 ├── 1-Entrega/
-│   ├── Abertura_RNF.ipynb        o cálculo, passo a passo
-│   └── rnf/                      saída mensal do notebook: rnf_<aaaa-mm>.xlsx
-├── src/
-│   └── RNF CCS <mmaaaa> ... .xlsb   relatório contábil da RNF do mês
-└── arquivo_morto_2026-10-04.zip  análise inicial e versão anterior (base BIP)
+│   ├── Abertura_RNF.ipynb        o cálculo, passo a passo (só o Passo 1 muda por mês)
+│   ├── rnf/                      relatório detalhado: rnf_<aaaa-mm>.xlsx
+│   ├── receita_nao_faturada/     consolidado no layout da área: receita_nao_faturada_<aaaa-mm>.xlsx
+│   └── procedimentos/
+│       └── PROCEDIMENTO_RNF.md   manual gerencial do notebook
+├── 2-Checks/
+│   └── zubil/                    ZUBIL_146 do mês só com as colunas usadas no cálculo
+├── 3-Py/
+│   └── 2-Checks/
+│       └── extrai_zubil_colunas.py
+├── src/                          entradas do mês (não versionadas)
+└── 9-Historico/                  versões anteriores do processo
 ```
 
 | Pasta / arquivo | Para que serve |
 |---|---|
-| [`1-Entrega/Abertura_RNF.ipynb`](1-Entrega/Abertura_RNF.ipynb) | O processo completo. Lê o relatório contábil, monta as linhas do SAP e dos ajustes manuais, valoriza pela tarifa homologada, leva ao valor do relatório e concilia. |
-| `1-Entrega/rnf/rnf_<ref>.xlsx` | Resultado mensal. `Componentes` traz os blocos 1 e 2 na tarifa de aplicação; `Componentes_BE` o bloco 2 na base econômica; `Familias` as sete famílias nas quatro camadas; `Resumo` por origem, mercado e classe; `Conciliacao` o fechamento com o relatório; `Nao_tarifaveis` reativo e bandeira. |
-| `src/RNF CCS ... .xlsb` | Relatório contábil da RNF: é a fonte de volume e valor. |
-| `../BW/tbl/tarifas/tarifa_long.csv` | Tabela de tarifas homologadas, compartilhada com a fase I. |
-| `../BW/1-Entrega/pxq/pxq_<ref>.xlsx` | P × Q do Faturamento do mesmo mês: fornece a divisão por posto horário. |
+| [`1-Entrega/Abertura_RNF.ipynb`](1-Entrega/Abertura_RNF.ipynb) | O processo completo: lê o ZUBIL e os ajustes manuais, valoriza pela tarifa homologada, leva ao valor registrado, concilia e grava as duas saídas. |
+| `1-Entrega/rnf/rnf_<ref>.xlsx` | Relatório detalhado. `Provisao`, `Estorno`, `Saldo` e `Saldo_YTD` por origem, mercado, classe, subgrupo e modalidade, com os 37 itens e as famílias; `Componentes`, `Componentes_BE` e `Familias` linha a linha; `Resumo`; `Nao_tarifaveis`; conciliações; `Layout_base` (fonte do estorno do mês seguinte). |
+| `1-Entrega/receita_nao_faturada/receita_nao_faturada_<ref>.xlsx` | Consolidado no layout Receita Faturada (R$ mil): `Provisao`, `Estorno`, `Saldo`, `Saldo_YTD` e `Conferencia`. |
+| [`1-Entrega/procedimentos/PROCEDIMENTO_RNF.md`](1-Entrega/procedimentos/PROCEDIMENTO_RNF.md) | O que cada passo do notebook faz e por quê. |
+| [`3-Py/2-Checks/extrai_zubil_colunas.py`](3-Py/2-Checks/extrai_zubil_colunas.py) | Grava o ZUBIL do mês só com as colunas usadas (`2-Checks/zubil/`): `python 3-Py/2-Checks/extrai_zubil_colunas.py 2026-08`. |
+| `src/` | Relatório mensal da RNF (`RNF CCS <mmaaaa> ... .xlsb`, fonte da aba do ZUBIL_146), base de ajustes manuais (`BASE_ESTIMADO_RNF_POR_CLUSTER_<aaaamm>.xlsx`) e consolidação da margem (`SP_Consolidacao Margem_<aaaa>.<mm>.xlsx`, aba `Base RNF`). |
+| `../BW/tbl/tarifas/tarifa_long.csv` | Tabela de tarifas homologadas, compartilhada com o Faturamento. |
+| `../BW/1-Entrega/pxq/pxq_<ref>.xlsx` | P × Q do Faturamento do mesmo mês: composição do faturado do grupo A (ponta e demanda). |
+| `../BW/tbl/modelo/De-Para_Modelo_PyC.xlsx` e `../BW/3-Py/1-Entrega/gera_receita_faturada.py` | Modelo e de-para do layout Receita Faturada, os mesmos do Faturamento. |
+| `9-Historico/` | Versão anterior, que partia do relatório contábil da RNF, e o contexto da especificação da base de ajustes. |
 
-**Rotina mensal:**
+**Rotina mensal**
 
 1. Rodar o P × Q do Faturamento do mês (`SP/BW`).
-2. Colocar o relatório contábil da RNF em `src/`.
-3. Ajustar `REFERENCIA` no Passo 1 do notebook e executar.
+2. Colocar em `src/` o relatório da RNF do mês, a base de ajustes manuais e a consolidação da margem.
+3. Ajustar `REFERENCIA` no Passo 1 do notebook e executar. Os meses rodam em ordem cronológica, porque
+   o estorno de cada mês é lido da saída do mês anterior.
 
 ## 3. Embasamento regulatório
 
-As regras de estrutura tarifária (TUSD, TE, famílias e camadas), cliente cativo e livre, fonte
-incentivada, APE e benefícios sociais são as mesmas do Faturamento e estão no
-[README do BW](../BW/README.md), seção 3. Aqui estão só as diferenças.
+As regras de estrutura tarifária, cliente cativo e livre, fonte incentivada, APE e benefícios sociais
+são as do [README do BW](../BW/README.md), seção 3. Aqui estão só as particularidades da RNF.
 
 ### 3.1 O que é RNF e por que ela existe
 
@@ -76,8 +90,8 @@ incentivada, APE e benefícios sociais são as mesmas do Faturamento e estão no
 cumprida, isto é, quando a energia é entregue) e Manual de Contabilidade do Setor Elétrico (MCSE),
 conta *Consumidores – Fornecimento não Faturado*.
 
-**Impacto no cálculo:** não há fatura. O valor de referência é o que a contabilidade registrou; o
-processo o decompõe por item tarifário.
+**Impacto no cálculo:** não há fatura. O valor de referência é o que o SAP e os ajustes manuais
+registram; o processo o decompõe por item tarifário.
 
 ### 3.2 Regras herdadas do Faturamento
 
@@ -85,148 +99,142 @@ processo o decompõe por item tarifário.
 |---|---|---|
 | Estrutura da tarifa e camadas | 3.1 | Igual. Mesma tabela, mesmos itens e famílias. |
 | Cativo e livre | 3.2 | Cativo: energia em TUSD e TE, demanda em TUSD. Livre: só TUSD. |
-| Fonte incentivada e APE | 3.3 e 3.4 | O ZUBIL não identifica o cliente. O efeito vai para Fio A e Fio B pelo regime fio do livre do grupo A, como na 1ª passada do Faturamento. |
-| Benefícios sociais | 3.5 | Mesma regra: a participação de cada faixa de consumo é estimada pelo valor registrado de cada linha. |
-| Vigência | 3.6 | No mês do reajuste, o peso de cada vigência por subgrupo é estimado pelo valor registrado, como no Faturamento. |
-| O que não é tarifa | 3.8 | Os valores do ZUBIL contêm PIS/COFINS; o tributo é retirado antes da abertura, pela alíquota informada no próprio relatório. Tributo, reativo e bandeira voltam na conciliação. |
+| Fonte incentivada e APE | 3.3 e 3.4 | O ZUBIL não identifica o cliente. O desconto é estimado pelo valor registrado e aplicado sobre Fio A e Fio B. |
+| Benefícios sociais | 3.5 | A participação de cada faixa de consumo é estimada pelo valor registrado de cada linha. |
+| Vigência | 3.6 | Vale a vigência do último dia do mês. |
+| O que não é tarifa | 3.8 | PIS/COFINS, reativo e bandeira ficam fora da abertura e voltam na conciliação e no layout. |
+
+### 3.3 O que o ZUBIL informa e o que o valor contém
+
+O ZUBIL informa a energia sem posto horário e a demanda de uma única coluna. O valor registrado,
+porém, contém a energia de ponta, a demanda nos dois postos e os descontos de fonte incentivada e
+APE, como no faturamento do mês. Por isso:
+
+- a demanda informada entra no bloco 1, no cativo e no livre do grupo A;
+- no livre, o SAP registra a receita de demanda na coluna "TUSD TE" e a de energia na coluna "TUSD":
+  cada linha livre gera uma linha de energia e uma de demanda;
+- o que a quantidade informada não explica (energia de ponta, demanda não informada no Azul) é aberto
+  pela composição do faturado do mesmo mês.
 
 ## 4. Implementação
 
-O notebook percorre as etapas abaixo. Cada passo tem, no próprio notebook, uma célula de texto com o
-porquê.
+O notebook percorre as etapas abaixo. O porquê de cada uma está no
+[procedimento](1-Entrega/procedimentos/PROCEDIMENTO_RNF.md), na seção de mesmo número.
 
 **Preparação**
 
-- **Leitura do relatório** (Passo 2). Quatro abas, localizadas pelo rótulo das linhas: o ZUBIL_146
-  detalhado, o volume dos ajustes por classe, o valor dos ajustes e o comparativo do mês.
-- **Linhas do SAP** (Passo 3). O ZUBIL é somado por classe, subclasse e categoria tarifária. Energia,
-  demanda do cativo do grupo A e valor saem de colunas próprias; reativo e bandeira vão para os não
-  tarifáveis. Categorias e classes são traduzidas por tabelas explícitas.
-  O mercado segue a convenção do relatório: colunas de TE e "TUSD TE" são cativo, coluna "TUSD" é
-  livre, qualquer que seja a categoria.
-- **Ajustes manuais** (Passo 4). O valor de cada classe é volume × tarifa média do ZUBIL da classe,
-  ajustado ao total do ajuste. Dentro da classe, o ajuste herda o mix das linhas do SAP. A
-  iluminação pública recebe linha própria (B4a).
-- **PIS/COFINS** (Passo 4b). Retirado do valor do relatório pela alíquota do próprio relatório (aba
-  `RNF TOI SP`, células "Alíquota de COFINS" e "Alíquota de PIS").
-- **Chave tarifária** (Passo 5) e **posto horário** (Passo 6). O posto vem do P × Q do Faturamento do
-  mesmo mês: a participação de ponta, fora ponta e intermediário no consumo e na demanda faturados
-  do mesmo subgrupo, modalidade, mercado e classe.
+- **ZUBIL_146** (Passos 2 e 3). Linhas somadas por classe, subclasse e categoria tarifária, com
+  tabelas explícitas de categoria e classe. Energia, demanda e valor saem de colunas próprias; reativo
+  e bandeira vão para os não tarifáveis. Cada linha livre é separada em energia e demanda.
+- **Ajustes manuais** (Passo 4). Lidos da base de ajustes, linha a linha, com os atributos da base.
+  O ajuste de carga e o ajuste dos livres, sem atributos, herdam o mix do SAP do mesmo mercado.
+- **PIS/COFINS** (Passo 5). Retirado do valor do ZUBIL pelas alíquotas da base de ajustes.
+- **Chave tarifária e posto** (Passos 6 e 7). Mesma chave de 8 atributos da tabela de tarifas;
+  energia e demanda do grupo A na tarifa fora ponta.
 
 **Valorização**
 
-- **Bloco 1** (Passos 7 e 8). Energia e demanda × tarifa homologada, nos 37 itens e nas quatro
-  camadas. No mês do reajuste, o peso de cada vigência por subgrupo é estimado pelo valor registrado,
-  como na tarifa proporcional do Faturamento.
-- **Benefícios sociais** (Passo 8). O ZUBIL traz, por subclasse, o total de energia e de valor dos
-  clientes de Tarifa Social e de Desconto Social, mas não a parte do consumo que cai em cada faixa. A
-  tarifa muda com a faixa:
+- **Bloco 1** (Passo 8). Energia e demanda × tarifa homologada, nos 37 itens e nas quatro camadas,
+  com energia e demanda separadas. Benefícios sociais pela estimativa das faixas.
+- **Bloco 2** (Passo 9). A diferença para o valor registrado é devolvida aos itens a que pertence:
 
-  | Benefício | Faixa 01 | Faixa 02 |
-  |---|---|---|
-  | Tarifa Social | até 80 kWh: gratuidade (tarifa zero) | acima de 80 kWh: tarifa `Baixa Renda` (sem CDE, PROINFA, CDE COVID e CDE GD) |
-  | Desconto Social | até 120 kWh: chave `Desconto Social – faixa 01` (sem CDE, CDE COVID e CDE GD) | acima de 120 kWh: chave `Desconto Social – faixa 02` (tarifa residencial) |
-
-  Cada linha é valorizada nas duas faixas (A = toda a energia na faixa 01; B = toda na faixa 02), e a
-  participação da faixa 02 é a que reproduz o valor registrado: `s2 = (R − A) / (B − A)`, limitada a
-  [0, 1]. O bloco 1 da linha é `(1 − s2) × A + s2 × B`, item a item. É a mesma aproximação do
-  Faturamento (README do BW, 3.5).
-
-  Em agosto/2026, nas linhas do SAP: Tarifa Social com 63.816 MWh e R$ 612,14/MWh registrados, contra
-  R$ 623,09/MWh da tarifa `Baixa Renda` → 98,2% da energia na faixa 02; Desconto Social com 12.867 MWh
-  e R$ 698,69/MWh, entre R$ 633,66 (faixa 01) e R$ 789,38 (faixa 02) → 41,8% na faixa 02. A
-  participação quase integral da faixa 02 na Tarifa Social indica que a RNF registra a parte gratuita
-  pela tarifa `Baixa Renda` (sessions, P16).
-- **Bloco 2** (Passo 9). Livre do grupo A: a diferença vai para Fio A e Fio B, na composição da
-  tarifa de demanda. Demais linhas: rateio proporcional por todos os itens.
+  | Linha | Regra |
+  |---|---|
+  | Demanda do livre | Aplicação do desconto de fonte incentivada e APE sobre Fio A e Fio B |
+  | Energia do grupo A (cativo e livre) | Composição do faturado do mesmo mês, só nos postos que o bloco 1 não valoriza (energia de ponta e demanda) |
+  | Demais linhas | 2ª passada: rateio proporcional pelos itens |
 
 **Saída e conferência**
 
-- **Conferências** (Passo 10): bloco 2 igual ao valor do relatório linha a linha; TA = BE + CVA +
-  FIN; famílias = componentes; volume aberto igual ao volume do relatório.
-- **Conciliação** (Passo 11): aberto + PIS/COFINS + reativo + bandeira = valor contabilizado na conta
-  1120110910 (`Conciliação contábil Novo`).
-- **Gravação** (Passo 12): `rnf_<ref>.xlsx`, no desenho do `pxq_<ref>.xlsx`.
+- **Conferências** (Passo 10): bloco 2 igual ao valor líquido linha a linha; TA = BE + CVA + FIN;
+  famílias = componentes; ZUBIL igual ao cluster `Sistema` da base de ajustes.
+- **Conciliação** (Passo 11): aberto + PIS/COFINS + reativo + bandeira contra a aba `Base RNF` da
+  consolidação da margem, bloco a bloco.
+- **Layout** (Passo 12): provisão convertida no layout Receita Faturada, com o modelo e o de-para do
+  Faturamento.
+- **Gravação** (Passos 13 e 14): relatório detalhado e consolidado, com provisão, estorno e saldo.
 
 ## 5. Resultados obtidos
 
-Janeiro a agosto de 2026, um relatório contábil por mês. Setembro ainda não roda: depende do P × Q do
-Faturamento de setembro (sessions, P14).
+Agosto de 2026.
 
 ### 5.1 Do valor pela tarifa ao valor registrado
 
-A conta de chegada é a mesma do Faturamento: `(a) valor registrado = (b) bloco 1 + (d) APE + (e) regime
-fio + (f) 2ª passada + (g) resíduo`.
+```
+(a) RNF registrada = (b) bloco 1 + (d) desconto na demanda do livre + (e) composição do faturado
+                     + (f) 2ª passada + (g) resíduo
+```
 
-| Item | Unidade | jan | fev | mar | abr | mai | jun | jul | ago |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| (a) RNF contabilizada, líquida de PIS/COFINS (base tarifável) | R$ milhões | 1.512,2 | 1.400,0 | 1.566,3 | 1.415,1 | 1.418,6 | 1.446,2 | 1.501,0 | 1.711,3 |
-| (b) Bloco 1 (tarifa cheia) | R$ milhões | 1.511,8 | 1.405,1 | 1.564,2 | 1.421,6 | 1.428,4 | 1.447,4 | 1.513,5 | 1.730,3 |
-| (c) Diferença a explicar, (b) − (a) | R$ milhões | −0,4 | 5,2 | −2,1 | 6,5 | 9,8 | 1,2 | 12,6 | 18,9 |
-| (d) Isenção APE | R$ milhões | — | — | — | — | — | — | — | — |
-| (e) Regime fio, livre do grupo A (1ª passada) | R$ milhões | 14,8 | 6,8 | 14,2 | 4,3 | 4,9 | 12,0 | 5,8 | 4,9 |
-| (f) 2ª passada, líquida | R$ milhões | −14,3 | −11,9 | −12,1 | −10,8 | −14,7 | −13,1 | −18,3 | −23,8 |
-| (g) Resíduo não ajustável | R$ milhões | 0,0 | 0,0 | 0,0 | 0,0 | 0,0 | 0,0 | 0,0 | 0,0 |
-| (h) 2ª passada, bruta | R$ milhões | 26,0 | 24,4 | 25,7 | 27,3 | 28,3 | 29,1 | 34,5 | 35,8 |
+| Item | MR$ |
+|---|---:|
+| (a) RNF registrada, líquida de PIS/COFINS (base tarifável) | 1.716,31 |
+| (b) Bloco 1: quantidade × tarifa cheia | 1.654,82 |
+| (c) Diferença a explicar, (b) − (a) | −61,50 |
+| (d) Aplicação do desconto na demanda do livre | −10,35 |
+| (e) Composição do faturado: energia de ponta e demanda do grupo A | 72,04 |
+| (f) 2ª passada, líquida | −0,19 |
+| (g) Resíduo sem item tarifário | 0,00 |
+| (h) 2ª passada, bruta | 8,39 |
 
-**O que é cada linha:**
+**O que é cada linha**
 
-- **(a)** Valor da RNF registrado no relatório (SAP ZUBIL_146 + ajustes manuais), sem reativo, bandeira
-  e PIS/COFINS. É o que a abertura precisa reproduzir.
-- **(b)** Energia e demanda não faturadas × tarifa homologada, com os benefícios sociais. No mês do
-  reajuste (julho), cada subgrupo combina as duas vigências pelo peso estimado no Passo 8.
-- **(c)** O quanto a tarifa sozinha não explica. Fica entre −0,1% e +1,1% de (a) em todos os meses.
-- **(d)** Não se aplica: o ZUBIL não identifica o APE. O desconto, quando existe, fica em (e).
-- **(e)** Diferença do livre do grupo A, levada para Fio A e Fio B: demanda não valorizada do livre e
-  descontos de fonte incentivada e APE. Positiva: o valor registrado é maior que a energia pela tarifa.
-- **(f)** Ajuste proporcional das demais linhas, somado com sinal. Entre −0,8% e −1,4% de (a).
-- **(g)** Linhas com valor no relatório e bloco 1 zero. Nenhuma no período.
-- **(h)** A mesma 2ª passada em valor absoluto, linha a linha: o quanto ela mexe, sem compensação entre
-  sinais. Entre 1,6% e 2,3% de (a).
+- **(a)** Valor da RNF do ZUBIL e dos ajustes manuais, sem PIS/COFINS, reativo e bandeira. É o que a
+  abertura precisa reproduzir.
+- **(b)** Energia e demanda não faturadas × tarifa homologada cheia, com os benefícios sociais.
+- **(c)** O quanto a quantidade informada não explica. Negativa: o valor registrado fica acima do
+  bloco 1, porque contém a energia de ponta e demanda que a quantidade não traz.
+- **(d)** A demanda do livre valorizada pela tarifa cheia menos o valor registrado: o desconto de
+  fonte incentivada e APE.
+- **(e)** Livre MR$ 55,44 e cativo MR$ 16,60: energia de ponta (relevante no Verde) e demanda não
+  informada (relevante no Azul), abertas pela composição do faturado do mês.
+- **(f) e (h)** Rateio proporcional das demais linhas, com sinal e em módulo. Vem dos ajustes manuais,
+  valorizados pela tarifa média de cada classe; da iluminação pública (B4a e B4b não separadas); e da
+  Branca (sem posto).
 
-**Leitura:** a tarifa homologada explica a RNF contabilizada com diferença inferior a 1,5% em todos os
-meses. O ajuste que o bloco 2 faz é pequeno, então a composição por item vem da tarifa, não do rateio.
+**Leitura:** depois de tratados a demanda e os postos horários, a 2ª passada líquida é praticamente
+zero. A composição por item vem da tarifa e do faturado, não do rateio.
 
-### 5.2 Conciliação com o valor contabilizado
+### 5.2 Conciliação com a `Base RNF`
 
-| Item | Unidade | jan | fev | mar | abr | mai | jun | jul | ago |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| (a) Valor líquido aberto por item | R$ milhões | 1.512,2 | 1.400,0 | 1.566,3 | 1.415,1 | 1.418,6 | 1.446,2 | 1.501,0 | 1.711,3 |
-| (i) PIS/COFINS retirado | R$ milhões | 77,9 | 90,3 | 81,7 | 72,6 | 95,4 | 65,9 | 81,5 | 96,7 |
-| (j) Reativo | R$ milhões | 7,4 | 7,0 | 7,2 | 7,6 | 7,0 | 6,6 | 6,7 | 7,6 |
-| (k) Bandeira | R$ milhões | 0,0 | 0,0 | 0,0 | 0,0 | 31,1 | 31,8 | 32,1 | 33,8 |
-| **(a) + (i) + (j) + (k)** | R$ milhões | **1.597,6** | **1.497,3** | **1.655,2** | **1.495,3** | **1.552,0** | **1.550,6** | **1.621,4** | **1.849,5** |
-| Contabilizado (`Conciliação contábil Novo`, conta 1120110910) | R$ milhões | 1.597,6 | 1.497,3 | 1.655,2 | erro no relatório | 1.552,0 | 1.550,6 | 1.621,4 | 1.849,5 |
-| `Comparativo Novo`, Não Faturado (informativo) | R$ milhões | 1.597,6 | 1.497,3 | 1.655,2 | 1.495,3 | 1.552,0 | 1.550,6 | 1.702,3 | 1.849,5 |
+| Bloco | `Base RNF` (MR$) | Abertura (MR$) | Diferença (MR$) |
+|---|---:|---:|---:|
+| Consumo Cativo | 1.065,51 | 1.065,51 | 0,00 |
+| TOI | 72,07 | 72,31 | 0,24 |
+| Pendentes | 293,38 | 293,29 | −0,10 |
+| Artigo 113 | 95,95 | 95,86 | −0,08 |
+| Carga | 26,45 | 26,45 | 0,00 |
+| Bandeira | 33,85 | 33,85 | 0,00 |
+| Total Livres | 262,29 | 262,29 | 0,00 |
+| **Total** | **1.849,50** | **1.849,56** | **0,06** |
 
-A diferença contra o contabilizado é menor que R$ 0,05 em todos os meses. Em abril a célula do
-contabilizado está com erro de fórmula no relatório, e a conciliação é feita contra o `Comparativo
-Novo`. Em julho, o `Comparativo Novo` fica R$ 81,0 milhões acima do contabilizado, e o próprio
-relatório acusa a diferença no "Check" (sessions, P13).
+Composição do total aberto: valor por item MR$ 1.716,31 + PIS/COFINS 91,82 + reativo 7,58 + bandeira
+33,85. A diferença de MR$ 0,06 vem da distribuição por classe do TOI, das faturas pendentes e do
+art. 323 na base de ajustes, diferente da usada na `Base RNF`.
 
-### 5.3 Abertura por família e camada, agosto/2026
+### 5.3 Abertura por família e camada
 
 | Família | Cativo | Livre | Total | % do total |
 |---|---:|---:|---:|---:|
-| FIO A | 143,8 | 21,5 | 165,3 | 9,7% |
-| FIO B | 384,6 | 32,7 | 417,2 | 24,4% |
-| ENCARGOS | 357,3 | 178,1 | 535,5 | 31,3% |
-| PERDAS | 86,0 | 18,4 | 104,4 | 6,1% |
-| ENERGIA | 506,7 | 0,0 | 506,7 | 29,6% |
-| OUTROS | −15,3 | −2,4 | −17,8 | −1,0% |
-| **Total** | **1.463,1** | **248,3** | **1.711,3** | **100,0%** |
+| FIO A | 129,33 | 34,37 | 163,70 | 9,5% |
+| FIO B | 382,40 | 30,86 | 413,27 | 24,1% |
+| ENCARGOS | 352,65 | 185,92 | 538,56 | 31,4% |
+| PERDAS | 88,73 | 19,32 | 108,05 | 6,3% |
+| ENERGIA | 511,09 | 0,00 | 511,09 | 29,8% |
+| OUTROS | −15,18 | −3,18 | −18,36 | −1,1% |
+| **Total** | **1.449,03** | **267,28** | **1.716,31** | **100,0%** |
 
-| Camada | R$ milhões | % do total |
+| Camada | MR$ | % do total |
 |---|---:|---:|
-| BE | 1.642,1 | 96,0% |
-| CVA | 104,4 | 6,1% |
-| FIN | −35,1 | −2,1% |
+| BE | 1.647,25 | 96,0% |
+| CVA | 105,08 | 6,1% |
+| FIN | −36,02 | −2,1% |
 
-Bloco 2, tarifa de aplicação, sem tributos, R$ milhões.
+Bloco 2, tarifa de aplicação, líquido de PIS/COFINS.
 
 ### 5.4 Validações
 
-Todas as conferências passaram nos oito meses: bloco 2 igual ao valor líquido em todas as linhas;
-TA = BE + CVA + FIN; famílias = componentes; conciliação com o contabilizado (5.2). A conferência de
-volume contra a aba `RNF_POR_CLASSE` é informativa: de janeiro a maio o pivô dessa aba não foi
-atualizado no relatório (sessions, P12).
+Todas as conferências internas passaram: bloco 2 igual ao valor líquido em todas as linhas;
+TA = BE + CVA + FIN; famílias = componentes; ZUBIL igual ao cluster `Sistema` da base de ajustes
+(energia e valor). O layout `receita_nao_faturada` grava o total da RNF (MR$ 1.849,56) sem valor fora
+do layout. Provisão, estorno, saldo e saldo YTD foram testados com meses simulados: estorno igual à
+provisão com sinal trocado, saldo e YTD zero.
