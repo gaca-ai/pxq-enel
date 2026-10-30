@@ -459,6 +459,10 @@ O que foi conferido:
 
 - **Base de partida.** A extração do BW reproduz exatamente o informe de gestão em receita,
   consumo e demanda, nos segmentos cativo AT, cativo BT e livre AT.
+- **Demanda do layout × informe de gestão.** O informe soma na demanda faturada do cativo a
+  ultrapassagem (`ZQD021` a `ZQD023`), que no layout é multa sem tarifa e fica fora do CONSUMO. Ela vai
+  na coluna DEMANDA ULTRAPASSAGEM (MW), logo após o CONSUMO. Com ela, a demanda fecha com o informe de
+  janeiro a agosto (diferença de até 0,12 MW); setembro aguarda a demanda das Usinas Geradoras (I6).
 - **Conferências internas.** Passam em todos os meses. O layout Receita Faturada concilia com a
   receita do BW com diferença zero.
 - **Desconto de fonte incentivada.** Em março, a 1ª passada ficou a 1,1% do subsídio de fonte

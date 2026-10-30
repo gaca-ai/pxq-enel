@@ -57,7 +57,7 @@ Regras:
     incentivada.
 - Geradoras, suprimentos e uso da distribuicao (SD) nao passam pelo bloco 2: nao tem origem
   atribuida (os blocos intermediarios sao a propria entrega).
-- Valores em R$ mil; consumo em MW (linha D) e MWh (linha E).
+- Valores em R$ mil; consumo em MW (linha D) e MWh (linha E); demanda de ultrapassagem em MW.
 """
 import os
 import sys
@@ -91,6 +91,7 @@ ABAS_ORIGEM = [("desconto_tarifa_social_dmr", "Tarifa Social – DMR", "[1]", "[
 # parts of the bloco 1 - bloco 2 gap not reimbursed by the CDE: taken out of the tariff baseline
 # ([H] = [1] - SCEE - APE) and shown only as a memo in the reconciliation
 FORA = [("SCEE - Baixa Renda", "[D]", "[T]"), ("Isenção de encargos (APE)", "[T]", "[A]")]
+QTD = {"CONSUMO", grf.COL_UD_MW}                                  # quantity columns (MW / MWh), not R$
 ID_COLS = ["Responsável", "Competência", "TipoFaturamento", "OpcaoCompra", "Classe", "Unidade"]
 CAMADAS_TOT = ["TA", "BE", "CVA", "FIN"]
 # monthly DMR (Diferenca Mensal de Receita) of the Tarifa Social, billed: informe de gestao, sheet 1.2
@@ -215,7 +216,7 @@ def gera(ref, modelo):
     def v(bloco, k, n):
         t = tabs[bloco][0]
         x = float(t.loc[k, n]) if k in t.index else 0.0
-        return x if n == "CONSUMO" else x / 1000.0               # R$ -> R$ mil
+        return x if n in QTD else x / 1000.0                     # R$ -> R$ mil
 
     # template: header of the delivery file of the month
     wb = openpyxl.load_workbook(DIR_RF / f"receita_faturada_{ref}.xlsx")
@@ -259,11 +260,11 @@ def gera(ref, modelo):
     escreve(abas[ABA_REAL], lambda k, n: v("[2]", k, n))
     for nome, _, de, para in ABAS_ORIGEM:
         escreve(abas[nome], lambda k, n, de=de, para=para:
-                0.0 if n == "CONSUMO" else v(de, k, n) - v(para, k, n))
+                0.0 if n in QTD else v(de, k, n) - v(para, k, n))
     for i in range(4, ultima + 2):
         for n in nomes_valor + ["Total"]:
             L = letra[n]
-            abas[ABA_DIF][f"{L}{i}"] = ("=0" if n == "CONSUMO" else
+            abas[ABA_DIF][f"{L}{i}"] = ("=0" if n in QTD else
                                         f"='{ABA_HOMOL}'!{L}{i}-'{ABA_REAL}'!{L}{i}")
     abas[ABA_DIF].cell(2, 3, "DIFERENÇA = tarifa homologada (bloco 1) - tarifa realizada (bloco 2); "
                              "R$ mil; positivo = desconto")
@@ -309,7 +310,7 @@ def gera(ref, modelo):
     comp, be = prepara(pd.read_excel(DIR_PXQ / f"pxq_{ref}.xlsx", "Componentes"),
                        pd.read_excel(DIR_PXQ / f"pxq_{ref}.xlsx", "Componentes_BE"), f_dmr)
     tar = comp[comp["Tarifável?"] == "SIM"]
-    tot = {b: float(tabs[b][0].drop(columns="CONSUMO").values.sum()) for b in tabs}
+    tot = {b: float(tabs[b][0].drop(columns=list(QTD)).values.sum()) for b in tabs}
     origem = {rot: tot[de] - tot[para] for _, rot, de, para in ABAS_ORIGEM}
     tar_be = be[be["Tarifável?"] == "SIM"]
     ts_dmr = dmr if dmr is not None else estimado

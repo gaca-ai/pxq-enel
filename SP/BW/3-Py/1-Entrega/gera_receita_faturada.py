@@ -40,6 +40,11 @@ Regras (README, secao 5.1):
   tem a linha GERACAO / E, e o caso deixou de ocorrer com a energia das geradoras.
 - PIS/COFINS e ultrapassagem do SD (geradoras, suprimentos e uso da distribuicao) vem do pxq como
   nao tarifaveis e vao para PIS/COFINS e UD/ER da linha da propria opcao.
+- DEMANDA ULTRAPASSAGEM (coluna nova, logo apos CONSUMO, em MW, so na linha D): demanda de
+  ultrapassagem dos lancamentos nao tarifaveis de ultrapassagem (Grp.estatists.mont. com "ULTRAPA"),
+  coluna "Demanda (kW)" da aba Nao_tarifaveis_linha do pxq. Cativo (ZQD021 a ZQD023) e SD trazem a quantidade; a ultrapassagem
+  do livre (ZQD019, ZQD020, ZQD037) vem do BW so com R$, sem kW. E quantidade: nao entra no Total
+  nem na conciliacao de R$, e a demanda de ultrapassagem nao esta no CONSUMO.
 - Valores em R$ mil; so as linhas com valor sao gravadas.
 """
 import os
@@ -75,6 +80,8 @@ COL_ID = ["Responsável", "Competência", "TipoFaturamento", "OpcaoCompra", "Cla
 TIPOS = ("FAT", "REFAT", "CNR")                                    # billing types, in the model order
 COL_TIPO = "Tipo de faturamento"
 COL_UDER, COL_OUTROS = "UD/ER", "Outros"                          # new columns, before PIS/COFINS
+COL_UD_MW = "DEMANDA ULTRAPASSAGEM"                                # new quantity column (MW), after CONSUMO
+PADRAO_UD_MW = "ULTRAPA"                                           # demand overrun lines (non-tariff)
 PADRAO_UDER = "ULTRAPA|UFER|UFDR|REATIV"
 PADRAO_UNID_D = "DEMANDA|POTÊNCIA|POTENCIA|\\(KW\\)|UFDR|CONEX"
 
@@ -168,6 +175,8 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     valores = [c for c in cab.values() if c not in COL_ID]
     pos = valores.index(cab["PIS/COFINS"])
     valores[pos:pos] = [COL_UDER, COL_OUTROS]
+    valores.insert(valores.index(cab["CONSUMO"]) + 1, COL_UD_MW)
+    qtd = {cab["CONSUMO"], COL_UD_MW}                              # quantity columns (not R$)
     linhas = []
     fora = []                                                      # (category, detail, R$)
     ok_tar = tar["OPCAO"].notna() & tar["CLASSE"].notna()
@@ -235,6 +244,18 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
         if abs(v) > 0.005:
             extra[(tp, o, cl, u, COL_OUTROS)] = extra.get((tp, o, cl, u, COL_OUTROS), 0.0) + v
 
+    # demand overrun quantity (MW), D row of the option x class: overrun lines of Nao_tarifaveis_linha
+    # (one row per BW line, so the class is exact); pxq generated before the "Demanda (kW)" column
+    # there: the column stays empty, with a warning
+    if "Demanda (kW)" in nt:
+        ud = nt[usa & mont_up.str.contains(PADRAO_UD_MW)]
+        for (tp, o, cl), v in (ud.groupby(["TIPO", "OPCAO", "CLASSE"])["Demanda (kW)"].sum() / 1000).items():
+            if abs(v) > 1e-9:
+                extra[(tp, o, cl, "D", COL_UD_MW)] = extra.get((tp, o, cl, "D", COL_UD_MW), 0.0) + v
+    else:
+        print(f"ATENCAO {ref}: pxq sem a coluna 'Demanda (kW)' em Nao_tarifaveis_linha; "
+              f"{COL_UD_MW} fica vazia (rodar o notebook de novo)")
+
     # ------------------------------------------------ assemble rows on the model grid
     extra_df = (pd.Series(extra, dtype=float).rename_axis(chave + ["COLUNA"])
                 .unstack("COLUNA") if extra else pd.DataFrame())
@@ -247,7 +268,7 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
         tp, k = k[0], k[1:]
         if k in na_grade:
             continue
-        valor = r.drop(cab["CONSUMO"]).sum()
+        valor = r.drop(list(qtd)).sum()
         alvo = (k[0], k[1], "D")
         if k[2] == "E" and alvo in na_grade:
             # no E row in the model for this option (GERACAO): value goes to Outros of the D row;
@@ -286,13 +307,26 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
             ws.column_dimensions[openpyxl.utils.get_column_letter(c if c < c_pis else c + 2)].width = w
     ws.column_dimensions[openpyxl.utils.get_column_letter(c_pis)].width = 10
     ws.column_dimensions[openpyxl.utils.get_column_letter(c_pis + 1)].width = 10
+    # demand overrun quantity column right after CONSUMO, same style as CONSUMO
+    c_cons = next(c for c in range(2, ws.max_column + 1) if ws.cell(3, c).value == cab["CONSUMO"])
+    larguras = {c: ws.column_dimensions[openpyxl.utils.get_column_letter(c)].width
+                for c in range(1, ws.max_column + 1)}
+    ws.insert_cols(c_cons + 1, 1)
+    for r in (2, 3, 4):
+        ws.cell(r, c_cons + 1)._style = copy.copy(ws.cell(r, c_cons)._style)
+    ws.cell(2, c_cons + 1).value = "MW"
+    ws.cell(3, c_cons + 1).value = COL_UD_MW
+    for c, w in larguras.items():                                 # shift the column widths
+        if w and c > c_cons:
+            ws.column_dimensions[openpyxl.utils.get_column_letter(c + 1)].width = w
+    ws.column_dimensions[openpyxl.utils.get_column_letter(c_cons + 1)].width = 14
     estilos = [copy.copy(ws.cell(4, c)._style) for c in range(1, ws.max_column + 1)]
     ws.delete_rows(4, ws.max_row)
     col_de = {ws.cell(3, c).value: c for c in range(2, ws.max_column + 1)}
     letra_i, letra_z = (openpyxl.utils.get_column_letter(col_de[cab[k]]) for k in ("PARCELA B", "BASE CVA"))
     for i, lin in enumerate(linhas, start=4):
         for nome, v in zip(COL_ID + valores, lin):
-            if nome != cab["CONSUMO"] and nome not in COL_ID:
+            if nome not in qtd and nome not in COL_ID:
                 v = v / 1000                                         # R$ -> R$ mil
             ws.cell(i, col_de[nome], v)
         ws.cell(i, col_de[cab["TOTAL"]], f"=SUM({letra_i}{i}:{letra_z}{i})")
@@ -304,10 +338,11 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     fora.append(("Componente BE sem coluna no modelo", "", sem_coluna.sum()))
     df_fora = pd.DataFrame(fora, columns=["Categoria", "Detalhe", "R$"])
     df_fora = df_fora[df_fora["R$"].abs() > 0.005]
-    gravado = sum(sum(v for v in l[7:]) for l in linhas)
+    i_valor = [6 + k for k, n in enumerate(valores) if n not in qtd]   # R$ positions in each row
+    gravado = sum(sum(l[i] for i in i_valor) for l in linhas)
     resumo = pd.DataFrame([
         ("Receita total do pxq (BW + SD)", receita_total),
-        ("Gravado no layout (colunas I a AE)", gravado),
+        ("Gravado no layout (colunas de valor)", gravado),
         ("Fora do layout (detalhe abaixo)", df_fora["R$"].sum()),
         ("Diferenca (deve ser zero)", receita_total - gravado - df_fora["R$"].sum()),
     ], columns=["Item", "R$"])
@@ -324,7 +359,7 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     ws_c.append([])
     ws_c.append(["Gravado por tipo de faturamento (R$)", None])
     for tp in TIPOS:
-        ws_c.append([tp, sum(sum(v for v in l[7:]) for l in linhas if l[2] == tp)])
+        ws_c.append([tp, sum(sum(l[i] for i in i_valor) for l in linhas if l[2] == tp)])
     ws_c.append([])
     for nota in notas:
         ws_c.append([nota])
@@ -365,7 +400,7 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     DIR_SAIDA.mkdir(parents=True, exist_ok=True)
     saida = DIR_SAIDA / f"receita_faturada_{ref}.xlsx"
     wb.save(saida)
-    por_tipo = " | ".join(f"{tp} {sum(sum(v for v in l[7:]) for l in linhas if l[2] == tp)/1e6:,.2f}"
+    por_tipo = " | ".join(f"{tp} {sum(sum(l[i] for i in i_valor) for l in linhas if l[2] == tp)/1e6:,.2f}"
                          for tp in TIPOS)
     print(f"{ref}: {len(linhas)} linhas ({por_tipo}) | gravado R$ {gravado/1e6:,.2f} mi | fora R$ "
           f"{df_fora['R$'].sum()/1e6:,.2f} mi | diferenca R$ {resumo['R$'].iloc[-1]:,.2f} | {saida.name}")

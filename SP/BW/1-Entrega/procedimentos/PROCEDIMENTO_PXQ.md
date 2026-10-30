@@ -536,7 +536,7 @@ A saída `1-Entrega/pxq/pxq_<ref>.xlsx` traz:
 | `Componentes` | Os 37 itens na tarifa de aplicação, blocos 1 e 2, mais os totais de BE, CVA e FIN do bloco 2. Colunas de ajuste: Tarifa Social, regime APE, 1ª e 2ª passadas. No fim, `Energia com TUSD (kWh)` e `Energia com TE (kWh)` (Passo 6) |
 | `Componentes_BE` | Os mesmos itens na base econômica (é o que alimenta o layout final). No fim, os totais por camada dos dois blocos: `[2] Total TA/BE/CVA/FIN` e `[1] Total TA/BE/CVA/FIN` (estes usados pelo check tarifa homologada × tarifa realizada) |
 | `Familias` | As sete famílias, nas quatro camadas, blocos 1 e 2 |
-| `Nao_tarifaveis_linha` | Cada lançamento não tarifável do BW, linha a linha, com classe, mercado e tipo de faturamento |
+| `Nao_tarifaveis_linha` | Cada lançamento não tarifável do BW, linha a linha, com classe, mercado, tipo de faturamento e demanda (kW) |
 | `Lotes_sem_calendario` | Lotes do BW com faturamento normal (FAT) fora do de-para do calendário de leitura: ficam com a tarifa do mês (Passo 4) |
 | `Diferencas_linha`, `Diferencas_grupo` | Só com `APLICAR_2A_PASSADA` desligado |
 
@@ -610,6 +610,13 @@ tarifa realizada use exatamente a mesma regra com o bloco 1.
     dentro de cada classe;
   - a unidade segue o próprio lançamento: demanda, potência, kW, UFDR e conexão vão para a linha D;
     o restante, para a linha E.
+- **DEMANDA ULTRAPASSAGEM (MW).** Coluna de quantidade que não existe no modelo da área, inserida logo
+  após CONSUMO e preenchida só na linha D: a demanda dos lançamentos de ultrapassagem (coluna
+  `Demanda (kW)` da aba `Nao_tarifaveis_linha`), por opção, classe e tipo de faturamento. Cativo
+  (`ZQD021`, `ZQD022`, `ZQD023`) e SD trazem a quantidade; a ultrapassagem do livre (`ZQD019`,
+  `ZQD020`, `ZQD037`) vem do BW só com R$, sem kW. Não entra no Total nem na conciliação de R$, e
+  esses kW não estão no CONSUMO. CONSUMO D + DEMANDA ULTRAPASSAGEM do cativo é a demanda faturada da
+  aba 2.2_Demanda do informe de gestão, que conta a ultrapassagem.
 - **Geração na linha de energia.** O conversor usa o modelo `tbl/modelo/De-Para_Modelo_PyC_sugerido.xlsx`,
   que é o modelo da área com a linha GERAÇÃO / E (sessions, P27). A energia das geradoras (usinas da
   EMAE) vai para essa linha, com o valor dela, e a coluna CONSUMO fecha com o informe de gestão. Se o
