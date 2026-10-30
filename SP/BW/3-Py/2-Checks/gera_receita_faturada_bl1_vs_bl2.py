@@ -1,7 +1,7 @@
 """
-Compara, no layout Receita Faturada, o bloco 1 (tarifa homologada sem os descontos) com o bloco 2
-(entrega) do PxQ e separa a diferenca por origem. Objetivo: identificar os itens que recebem
-descontos tarifarios, inclusive o beneficio da Tarifa Social reembolsado pela CDE.
+Compara, no layout Receita Faturada, a tarifa homologada com o bloco 2 (entrega) do PxQ e separa a
+diferenca por origem. Objetivo: identificar os itens que recebem descontos tarifarios reembolsados
+pela CDE (Tarifa Social e fonte incentivada).
 
 Uso:
     python gera_receita_faturada_bl1_vs_bl2.py 2026-06            # um mes
@@ -12,9 +12,10 @@ Entradas: 1-Entrega/pxq/pxq_<ref>.xlsx (abas Componentes e Componentes_BE, com o
 camada dos blocos 1 e 2 e as colunas de ajuste), 1-Entrega/receita_faturada/receita_faturada_<ref>.xlsx
 (so o cabecalho) e src/dmr_tarifa_social.csv (DMR faturada da Tarifa Social, informe de gestao).
 Saida: 2-Checks/receita_faturada_Bl1_vs_Bl2/receita_faturada_Bl1_vs_Bl2_<ref>.xlsx, com as abas
-  tarifa_homologada    layout pelo bloco 1: tarifa homologada (com tarifa proporcional); a Tarifa
-                       Social pela tarifa B1 subclasse Baixa Renda sem a reducao de 100% ate 80 kWh
-                       (PRORET 5.2, par. 129-130)
+  tarifa_homologada    layout pelo bloco 1 (tarifa homologada, com tarifa proporcional; a Tarifa
+                       Social pela tarifa B1 subclasse Baixa Renda sem a reducao de 100% ate 80 kWh,
+                       PRORET 5.2, par. 129-130) menos as duas parcelas que nao sao reembolsadas pela
+                       CDE: a isencao de encargos do APE e o SCEE - Baixa Renda (NOTA_FORA)
   tarifa_realizada     layout pelo bloco 2 (a entrega)
   diferenca            formulas Excel tarifa_homologada - tarifa_realizada, celula a celula
   ta_somada            tarifa de aplicacao somada (colunas I a Z), uma linha por opcao x classe x
@@ -22,12 +23,10 @@ Saida: 2-Checks/receita_faturada_Bl1_vs_Bl2/receita_faturada_Bl1_vs_Bl2_<ref>.xl
                        por origem
   desconto_tarifa_social_dmr   Tarifa Social - DMR: a DMR faturada do mes, aberta pelos itens na
                                proporcao da etapa Tarifa Social do bloco 2
-  scee_baixa_renda             SCEE - Baixa Renda(*): etapa Tarifa Social - DMR; nao e subsidio
-                               homologado (nota NOTA_SCEE)
-  desconto_ape                 parte da diferenca que vem da isencao de encargos do APE
   desconto_fonte_incentivada   parte que vem do desconto de fonte incentivada (1a passada)
   ajuste_2a_passada            ajuste de fechamento (nao e desconto)
-  conciliacao          soma das origens = diferenca, e conferencia com as colunas de ajuste do notebook
+  conciliacao          soma das origens = diferenca, conferencia com as colunas de ajuste do notebook
+                       e, como memoria, as duas parcelas retiradas da tarifa homologada
 Com mais de um mes, grava tambem consolidado_receita_faturada_Bl1_vs_Bl2_<ini>_a_<fim>.xlsx,
 com uma linha por mes em cada aba.
 
@@ -37,17 +36,21 @@ Regras:
   todas as linhas do modelo, inclusive as zeradas. Bandeira, UD/ER, Outros e tributos nao dependem
   do bloco e ficam iguais nos dois lados.
 - Diferenca positiva = desconto (o bloco 1 e maior que o bloco 2).
+- Fora da analise (retiradas da tarifa homologada; valores so na conciliacao, como memoria):
+  * Isencao de encargos (APE): PRORET 5.2, par. 81 e 91 - o consumo isento sai do mercado de rateio
+    da cota da CDE e nao e reembolsado; o custo fica com os demais consumidores pelo rateio.
+  * SCEE - Baixa Renda: e a TE do SCEE, homologada no reajuste, aplicada sobre a energia compensada.
 - Separacao por origem, linha a linha do pxq, na ordem das etapas do bloco 2 (Passo 9 do notebook):
   * Tarifa Social: a etapa do notebook (coluna "Ajuste Tarifa Social (R$)"), proporcional aos itens
     do bloco 1 da linha, em duas partes: DMR = a DMR faturada do mes (src/dmr_tarifa_social.csv) e
-    SCEE - Baixa Renda(*) = etapa - DMR. Mes sem DMR no arquivo: tudo em DMR (estimado), com aviso.
+    SCEE - Baixa Renda = etapa - DMR (fora da analise). Mes sem DMR no arquivo: tudo em DMR (estimado).
     O Desconto Social e a isencao de encargos ficam no bloco 1: nao sao reembolsados pela CDE
     (PRORET 5.2, par. 81 e 91).
   * 2a passada: fator unico sobre todos os itens da linha, f = bloco 2 / (bloco 2 - ajuste da
     2a passada). O valor antes da 2a passada e o bloco 2 / f, item a item e camada a camada.
   * Fonte incentivada: diferenca entre o valor depois da Tarifa Social e o valor antes da 2a
     passada nos itens de Fio A e Fio B (a 1a passada so atua nesses itens).
-  * APE: a mesma diferenca nos demais itens (a isencao do APE atua nos encargos).
+  * APE (fora da analise): a mesma diferenca nos demais itens (a isencao do APE atua nos encargos).
   * Base CVA e Base Financeira: exatas na Tarifa Social e na 2a passada (mesmo fator). Entre APE e
     fonte incentivada, a soma CVA + FIN de cada origem e exata (sai dos itens); a divisao entre CVA
     e FIN segue a proporcao da linha. So e aproximada quando a mesma linha tem APE e fonte
@@ -83,27 +86,29 @@ ABA_HOMOL, ABA_REAL, ABA_DIF, ABA_TA, ABA_CONC = ("tarifa_homologada", "tarifa_r
                                                    "ta_somada", "conciliacao")
 # (sheet, label, block before, block after)
 ABAS_ORIGEM = [("desconto_tarifa_social_dmr", "Tarifa Social – DMR", "[1]", "[D]"),
-               ("scee_baixa_renda", "SCEE - Baixa Renda(*)", "[D]", "[T]"),
-               ("desconto_ape", "APE", "[T]", "[A]"),
                ("desconto_fonte_incentivada", "Fonte incentivada", "[A]", "[P]"),
                ("ajuste_2a_passada", "2a passada", "[P]", "[2]")]
+# parts of the bloco 1 - bloco 2 gap not reimbursed by the CDE: taken out of the tariff baseline
+# ([H] = [1] - SCEE - APE) and shown only as a memo in the reconciliation
+FORA = [("SCEE - Baixa Renda", "[D]", "[T]"), ("Isenção de encargos (APE)", "[T]", "[A]")]
 ID_COLS = ["Responsável", "Competência", "TipoFaturamento", "OpcaoCompra", "Classe", "Unidade"]
 CAMADAS_TOT = ["TA", "BE", "CVA", "FIN"]
 # monthly DMR (Diferenca Mensal de Receita) of the Tarifa Social, billed: informe de gestao, sheet 1.2
 ARQ_DMR = BASE / "src" / "dmr_tarifa_social.csv"
-NOTA_SCEE = ("(*) SCEE - Baixa Renda: não é subsídio homologado com a DMR. Nos clientes Baixa Renda com "
-             "geração distribuída (SCEE), a energia compensada é faturada pela TE do SCEE, sem o componente de "
-             "energia (R$ 37,19 contra R$ 316,78/MWh; REN 1.000/2021, art. 655-I). O BW não identifica essa energia, "
-             "que é valorizada pela TE comum, e o subsídio calculado fica acima do real. Esta linha é a diferença "
-             "entre o valor calculado (energia faturada da Baixa Renda no BW pela tarifa B1 subclasse Baixa Renda "
-             "homologada, sem a redução de 100% até 80 kWh, menos a receita faturada) e a DMR faturada (informe de "
-             "gestão), que já usa a tarifa efetivamente cobrada.")
+NOTA_FORA = [
+    "Retiradas da tarifa homologada (não são reembolsadas pela CDE):",
+    "• Isenção de encargos (APE): com base no PRORET 5.2 (§81 e §91), o consumo isento de encargos sai do "
+    "mercado de rateio da cota da CDE e não é reembolsado. Esses encargos simplesmente não são cobrados desse "
+    "cliente, e o custo fica com os demais consumidores pelo rateio da cota.",
+    "• SCEE - Baixa Renda: é a TE do SCEE, homologada no reajuste, aplicada sobre a energia compensada.",
+]
 
 
 def nota(ws, linha, coluna=1):
-    """Footnote of the SCEE - Baixa Renda(*) line, in small grey italics."""
-    c = ws.cell(linha, coluna, NOTA_SCEE)
-    c.font = openpyxl.styles.Font(size=9, italic=True, color="808080")
+    """Footnote with the two parts taken out of the tariff baseline, in small grey italics."""
+    for k, texto in enumerate(NOTA_FORA):
+        c = ws.cell(linha + k, coluna, texto)
+        c.font = openpyxl.styles.Font(size=9, italic=True, color="808080")
 
 
 def le_dmr(ref):
@@ -122,7 +127,8 @@ def num(s):
 def prepara(comp, be, fator_dmr=1.0):
     """Add in-memory blocks, in the order of the bloco 2 steps: [T] = after the Tarifa Social step,
     [D] = bloco 1 minus only the DMR part of that step (fator_dmr = DMR / step), [A] = after APE,
-    before the 1st pass, [P] = before the 2nd pass."""
+    before the 1st pass, [P] = before the 2nd pass, [H] = tariff baseline = bloco 1 minus the parts
+    not reimbursed by the CDE (SCEE - Baixa Renda = [D] - [T]; APE = [T] - [A])."""
     itens = [c[4:] for c in comp.columns if c.startswith("[1] ") and not c.startswith("[1] Total")]
     tot1_ta = num(be["[1] Total TA"])
     aj_ts = num(comp[COL_AJ_TS]) if COL_AJ_TS in comp else pd.Series(0.0, index=comp.index)
@@ -170,7 +176,15 @@ def prepara(comp, be, fator_dmr=1.0):
             df.loc[sd, [f"[P] {i}", f"[A] {i}"]] = df.loc[sd, [f"[2] {i}"] * 2].values
         for c in CAMADAS_TOT:
             df.loc[sd, [f"[P] Total {c}", f"[A] Total {c}"]] = df.loc[sd, [f"[2] Total {c}"] * 2].values
-    return comp.copy(), be.copy()                                  # defragmented frames
+    # tariff baseline [H] = [1] - ([D] - [T]) - ([T] - [A]) = [1] - [D] + [A]; SD rows keep bloco 1
+    nomes = [f"{{}} {i}" for i in itens] + [f"{{}} Total {c}" for c in CAMADAS_TOT]
+
+    def com_h(df):
+        h = pd.DataFrame({k.format("[H]"): np.where(sd, df[k.format("[1]")],
+                                                    df[k.format("[1]")] - df[k.format("[D]")] + df[k.format("[A]")])
+                          for k in nomes}, index=df.index)
+        return pd.concat([df, h], axis=1)                         # one insert: defragmented frame
+    return com_h(comp), com_h(be)
 
 
 def fator_dmr(ref):
@@ -194,7 +208,7 @@ def layout(ref, modelo, bloco, f=1.0):
 def gera(ref, modelo):
     grade = [(op, cl, u) for _, op, cl, u in modelo[3]]
     f_dmr, estimado, dmr = fator_dmr(ref)
-    tabs = {b: layout(ref, modelo, b, f_dmr) for b in ("[1]", "[D]", "[T]", "[A]", "[P]", "[2]")}
+    tabs = {b: layout(ref, modelo, b, f_dmr) for b in ("[H]", "[1]", "[D]", "[T]", "[A]", "[P]", "[2]")}
     valores = tabs["[2]"][1]
     nomes_valor = [n for n in valores if n != "Total"]
 
@@ -233,10 +247,11 @@ def gera(ref, modelo):
             sheet.cell(t, col[n]).number_format = "#,##0.0"
 
     ws.title = ABA_HOMOL
-    escreve(ws, lambda k, n: v("[1]", k, n))
+    escreve(ws, lambda k, n: v("[H]", k, n))
     ws.cell(2, 3, "OBSERVAÇÃO: a Tarifa Social (Baixa Renda, BPC, Indígena, Quilombola) está valorizada pela "
                   "tarifa B1 subclasse Baixa Renda homologada, sem a redução de 100% até 80 kWh (PRORET 5.2, "
-                  "§129 e §130); os demais clientes, pela tarifa homologada. R$ mil")
+                  "§129 e §130); os demais clientes, pela tarifa homologada. Sem a isenção de encargos (APE) e "
+                  "sem o SCEE - Baixa Renda, que não são reembolsados pela CDE (notas abaixo). R$ mil")
     abas = {ABA_HOMOL: ws}
     for nome in [ABA_REAL, ABA_DIF] + [a for a, _, _, _ in ABAS_ORIGEM]:
         abas[nome] = wb.copy_worksheet(ws)
@@ -254,7 +269,8 @@ def gera(ref, modelo):
                              "R$ mil; positivo = desconto")
     for nome, rotulo, _, _ in ABAS_ORIGEM:
         abas[nome].cell(2, 3, f"{rotulo}: parte da diferença tarifa homologada - tarifa realizada (R$ mil)")
-    nota(abas["scee_baixa_renda"], ultima + 3, 2)
+    nota(abas[ABA_HOMOL], ultima + 3, 2)
+    nota(abas[ABA_DIF], ultima + 3, 2)
     for nome in [s for s in wb.sheetnames if s not in abas]:
         del wb[nome]
 
@@ -264,18 +280,19 @@ def gera(ref, modelo):
     def ta(bloco, k):
         return sum(v(bloco, k, n) for n in tarifarias)
     ws_t = wb.create_sheet(ABA_TA, index=wb.sheetnames.index(ABA_DIF) + 1)
-    cab_t = ["OpcaoCompra", "Classe", "Unidade", "TA tarifa homologada", "TA tarifa realizada", "Diferença",
-             "Tarifa Social – DMR", "SCEE - Baixa Renda(*)", "APE", "Fonte incentivada", "2a passada",
-             "Soma das origens - diferença"]
+    cab_t = (["OpcaoCompra", "Classe", "Unidade", "TA tarifa homologada", "TA tarifa realizada", "Diferença"]
+             + [rot for _, rot, _, _ in ABAS_ORIGEM] + ["Soma das origens - diferença"])
+    n_or = len(ABAS_ORIGEM)
+    l_or1, l_orn = get_column_letter(7), get_column_letter(6 + n_or)
     ws_t.append(["Tarifa de aplicação somada (colunas I a Z do layout), R$ mil; positivo = desconto"])
     ws_t.append(cab_t)
     for i, k in enumerate(grade, start=3):
-        b0, b2 = ta("[1]", k), ta("[2]", k)
+        b0, b2 = ta("[H]", k), ta("[2]", k)
         orig = [ta(de, k) - ta(para, k) for _, _, de, para in ABAS_ORIGEM]
-        ws_t.append(list(k) + [b0, b2, f"=D{i}-E{i}"] + orig + [f"=SUM(G{i}:K{i})-F{i}"])
+        ws_t.append(list(k) + [b0, b2, f"=D{i}-E{i}"] + orig + [f"=SUM({l_or1}{i}:{l_orn}{i})-F{i}"])
     t = len(grade) + 3
     ws_t.cell(t, 2, "TOTAL")
-    for j in range(4, 13):
+    for j in range(4, 8 + n_or):
         L = get_column_letter(j)
         ws_t.cell(t, j, f"=SUM({L}3:{L}{t - 1})")
     for row in ws_t.iter_rows(min_row=2):
@@ -285,7 +302,7 @@ def gera(ref, modelo):
             if cel.row in (2, t):
                 cel.font = openpyxl.styles.Font(bold=True)
     nota(ws_t, t + 2)
-    for L, w in zip("ABCDEFGHIJKL", (14, 26, 9, 14, 14, 16, 16, 18, 12, 18, 12, 22)):
+    for L, w in zip("ABCDEFGHI", (14, 26, 9, 14, 14, 16, 18, 18, 22)):
         ws_t.column_dimensions[L].width = w
 
     # reconciliation (R$): origins vs check, and vs the totals the notebook writes
@@ -296,17 +313,24 @@ def gera(ref, modelo):
     origem = {rot: tot[de] - tot[para] for _, rot, de, para in ABAS_ORIGEM}
     tar_be = be[be["Tarifável?"] == "SIM"]
     ts_dmr = dmr if dmr is not None else estimado
-    nb_aj = {"Tarifa Social – DMR": ts_dmr, "SCEE - Baixa Renda(*)": estimado - ts_dmr,
-             "APE": -num(tar.get(COL_AJ_APE, 0.0)).sum(), "Fonte incentivada": -num(tar[COL_AJ_1]).sum(),
+    nb_aj = {"Tarifa Social – DMR": ts_dmr, "Fonte incentivada": -num(tar[COL_AJ_1]).sum(),
              "2a passada": -num(tar[COL_AJ_2]).sum()}
+    fora = {rot: tot[de] - tot[para] for rot, de, para in FORA}
+    nb_fora = {"SCEE - Baixa Renda": estimado - ts_dmr, "Isenção de encargos (APE)": -num(tar.get(COL_AJ_APE, 0.0)).sum()}
     ws_c = wb.create_sheet(ABA_CONC)
     ws_c.append(["Conciliação (R$)", "Layout", "Notebook (ajustes do pxq)", "Diferença"])
     for nome in origem:
         ws_c.append([nome, origem[nome], nb_aj[nome], origem[nome] - nb_aj[nome]])
     ws_c.append(["Soma das origens", sum(origem.values()), sum(nb_aj.values()),
                  sum(origem.values()) - sum(nb_aj.values())])
-    ws_c.append(["Tarifa homologada - tarifa realizada (diferença)", tot["[1]"] - tot["[2]"], None,
-                 sum(origem.values()) - (tot["[1]"] - tot["[2]"])])
+    ws_c.append(["Tarifa homologada - tarifa realizada (diferença)", tot["[H]"] - tot["[2]"], None,
+                 sum(origem.values()) - (tot["[H]"] - tot["[2]"])])
+    ws_c.append([])
+    ws_c.append(["Memória: retiradas da tarifa homologada (R$)", "Layout", "Notebook (ajustes do pxq)", "Diferença"])
+    for rot in fora:
+        ws_c.append([rot, fora[rot], nb_fora[rot], fora[rot] - nb_fora[rot]])
+    ws_c.append(["Bloco 1 - tarifa realizada (diferença com as duas parcelas)", tot["[1]"] - tot["[2]"], None,
+                 sum(origem.values()) + sum(fora.values()) - (tot["[1]"] - tot["[2]"])])
     ws_c.append([])
     ws_c.append(["Tarifa Social estimada (etapa do bloco 2, R$)", estimado])
     ws_c.append(["DMR faturada do mês (informe de gestão, R$)", dmr if dmr is not None else "sem DMR no arquivo"])
@@ -314,6 +338,8 @@ def gera(ref, modelo):
     ws_c.append(["Coluna 'Notebook' das linhas da Tarifa Social: DMR do arquivo e estimado - DMR."])
     ws_c.append([])
     nota(ws_c, ws_c.max_row + 1)
+    ws_c.append([])
+    ws_c.append([])
     ws_c.append([])
     ws_c.append(["Positivo = desconto (bloco 1 maior que o bloco 2). A 2a passada não é desconto."])
     ws_c.append(["CVA e Base Financeira: divisão entre APE e fonte incentivada proporcional na linha "
@@ -329,11 +355,10 @@ def gera(ref, modelo):
     DIR_SAIDA.mkdir(parents=True, exist_ok=True)
     saida = DIR_SAIDA / f"receita_faturada_Bl1_vs_Bl2_{ref}.xlsx"
     wb.save(saida)
-    print(f"{ref}: homologada - realizada R$ {(tot['[1]'] - tot['[2]'])/1e6:,.2f} mi | Tarifa Social DMR "
-          f"{origem['Tarifa Social – DMR']/1e6:,.2f} | SCEE - Baixa Renda(*) {origem['SCEE - Baixa Renda(*)']/1e6:,.2f} | "
-          f"APE {origem['APE']/1e6:,.2f} | "
-          f"fonte incentivada {origem['Fonte incentivada']/1e6:,.2f} | 2a passada "
-          f"{origem['2a passada']/1e6:,.2f} | {saida.name}")
+    print(f"{ref}: homologada - realizada R$ {(tot['[H]'] - tot['[2]'])/1e6:,.2f} mi | Tarifa Social DMR "
+          f"{origem['Tarifa Social – DMR']/1e6:,.2f} | fonte incentivada {origem['Fonte incentivada']/1e6:,.2f} | "
+          f"2a passada {origem['2a passada']/1e6:,.2f} | fora: SCEE - Baixa Renda "
+          f"{fora['SCEE - Baixa Renda']/1e6:,.2f}, APE {fora['Isenção de encargos (APE)']/1e6:,.2f} | {saida.name}")
 
 
 def consolida(refs):
@@ -369,7 +394,7 @@ def consolida(refs):
         for c in ws[1]:
             c.font = openpyxl.styles.Font(bold=True)
         ws.cell(len(refs) + 3, 1, "R$ mil; positivo = desconto; consumo em MW + MWh")
-        if aba in (ABA_DIF, "scee_baixa_renda"):
+        if aba in (ABA_HOMOL, ABA_DIF):
             nota(ws, len(refs) + 4)
     saida = DIR_SAIDA / f"consolidado_receita_faturada_Bl1_vs_Bl2_{refs[0]}_a_{refs[-1]}.xlsx"
     out.save(saida)

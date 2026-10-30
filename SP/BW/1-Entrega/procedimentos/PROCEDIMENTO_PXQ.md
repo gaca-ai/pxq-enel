@@ -749,9 +749,17 @@ projetado e sem valor de conferência.
 ## Check tarifa homologada × tarifa realizada (descontos tarifários)
 
 O script `3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py` monta o layout Receita Faturada duas
-vezes, pelo bloco 1 (tarifa homologada sem os descontos; Passo 8) e pelo bloco 2 (tarifa realizada, a
-entrega), e separa a diferença por origem. O objetivo é identificar os itens tarifários que recebem
-descontos, inclusive o benefício da Tarifa Social reembolsado pela CDE.
+vezes, pela tarifa homologada e pelo bloco 2 (tarifa realizada, a entrega), e separa a diferença por
+origem. O objetivo é identificar os itens tarifários que recebem descontos reembolsados pela CDE
+(Tarifa Social e fonte incentivada).
+
+A tarifa homologada é o bloco 1 (Passo 8) sem as duas parcelas que não são reembolsadas pela CDE. Elas
+ficam só como memória na aba `conciliacao`:
+
+- **Isenção de encargos (APE):** com base no PRORET 5.2 (§81 e §91), o consumo isento de encargos sai do
+  mercado de rateio da cota da CDE e não é reembolsado. Esses encargos simplesmente não são cobrados
+  desse cliente, e o custo fica com os demais consumidores pelo rateio da cota.
+- **SCEE - Baixa Renda:** é a TE do SCEE, homologada no reajuste, aplicada sobre a energia compensada.
 
 ```
 python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py 2026-05            # um mês
@@ -765,16 +773,14 @@ de opção × classe × unidade.
 
 | Aba | Conteúdo |
 |---|---|
-| `tarifa_homologada` | Layout pelo bloco 1, com a observação de que a Tarifa Social está valorizada pela tarifa B1 subclasse Baixa Renda sem a redução |
+| `tarifa_homologada` | Layout pelo bloco 1 sem a isenção de encargos do APE e sem o SCEE - Baixa Renda, com a observação de que a Tarifa Social está valorizada pela tarifa B1 subclasse Baixa Renda sem a redução e a nota das duas parcelas retiradas |
 | `tarifa_realizada` | Layout pelo bloco 2 (igual à entrega) |
 | `diferenca` | Fórmulas `tarifa_homologada − tarifa_realizada`, célula a célula; positivo = desconto |
 | `ta_somada` | Tarifa de aplicação somada (colunas I a Z), por opção × classe × unidade: tarifa homologada, tarifa realizada, diferença e a parte de cada origem |
 | `desconto_tarifa_social_dmr` | Tarifa Social – DMR: a DMR faturada do mês, aberta pelos itens na proporção da etapa Tarifa Social |
-| `scee_baixa_renda` | SCEE - Baixa Renda(\*): estimado − DMR; não é subsídio homologado (nota de rodapé na aba) |
-| `desconto_ape` | Parte da diferença que vem da isenção de encargos do APE |
 | `desconto_fonte_incentivada` | Parte que vem do desconto de fonte incentivada (1ª passada) |
 | `ajuste_2a_passada` | Ajuste de fechamento; não é desconto |
-| `conciliacao` | Tarifa Social + APE + fonte incentivada + 2ª passada = diferença, e conferência com os ajustes que o notebook grava em `Componentes` |
+| `conciliacao` | Tarifa Social – DMR + fonte incentivada + 2ª passada = diferença, conferência com os ajustes que o notebook grava em `Componentes` e, como memória, SCEE - Baixa Renda e isenção de encargos (APE), que fecham com o bloco 1 − tarifa realizada |
 
 **Regras**
 
@@ -790,25 +796,27 @@ de opção × classe × unidade.
      - **Tarifa Social – DMR:** a DMR (Diferença Mensal de Receita) faturada do mês, lida de
        `src/dmr_tarifa_social.csv` (informe de gestão, aba 1.2_Clientes Baixa Renda, coluna
        "Subsídio Faturado – DMR"). É aberta pelos itens e camadas na proporção do estimado;
-     - **SCEE - Baixa Renda(\*):** estimado − DMR; não é subsídio homologado com a DMR. Nos clientes
-       Baixa Renda com geração distribuída, a energia compensada é faturada pela TE do SCEE, sem o
-       componente de energia (REN 1.000/2021, art. 655-I, §1º, II, "b"), e o benefício da Tarifa
-       Social também incide sobre ela (art. 655-G, §8º). O BW não identifica essa energia; valorizada
-       pela TE comum, ela infla o estimado. A explicação vai em nota de rodapé nas abas
-       `scee_baixa_renda`, `ta_somada` e `conciliacao` e no consolidado;
+     - **SCEE - Baixa Renda (retirada da tarifa homologada):** estimado − DMR. Nos clientes Baixa
+       Renda com geração distribuída, a energia compensada é faturada pela TE do SCEE (REN 1.000/2021,
+       art. 655-I, §1º, II, "b"), e o benefício da Tarifa Social também incide sobre ela (art. 655-G,
+       §8º). O BW não identifica essa energia; valorizada pela TE comum, ela infla o estimado;
      - mês sem DMR no arquivo: a Tarifa Social fica toda na linha DMR, com o valor estimado, e o
        script avisa.
    - **2ª passada:** fator único sobre todos os itens da linha, f = bloco 2 ÷ (bloco 2 − ajuste da
      2ª passada). O valor antes da 2ª passada é o bloco 2 ÷ f, item a item e camada a camada.
    - **Fonte incentivada:** diferença entre o bloco 1 e o valor antes da 2ª passada nos itens de
      Fio A e Fio B, os únicos em que a 1ª passada atua.
-   - **APE:** a mesma diferença nos demais itens (a isenção do APE atua nos encargos).
+   - **Isenção de encargos (APE, retirada da tarifa homologada):** a mesma diferença nos demais itens
+     (a isenção do APE atua nos encargos).
+   - **Tarifa homologada:** bloco 1 − SCEE - Baixa Renda − isenção de encargos (APE), item a item e
+     camada a camada; nas linhas do SD, o próprio bloco 1.
 4. Base CVA e Base Financeira: a parte da 2ª passada é exata. Entre APE e fonte incentivada, a soma
    CVA + FIN de cada origem é exata; a divisão entre CVA e FIN segue a proporção da própria linha.
    Só é aproximada nas linhas que têm as duas etapas.
 5. Geradoras, suprimentos e uso da distribuição (SD) não passam pelo bloco 2 e não têm origem
    atribuída.
-6. O total de cada origem fecha com os ajustes gravados pelo notebook (aba `conciliacao`).
+6. O total de cada origem, e das duas parcelas da memória, fecha com os ajustes gravados pelo
+   notebook (aba `conciliacao`).
 
 **Limites do check**
 
@@ -816,11 +824,11 @@ de opção × classe × unidade.
   (rural, irrigante) continuam dentro do bloco 1 e não aparecem na diferença. Os dois primeiros não
   são reembolsados pela CDE (Passo 8).
 - A Tarifa Social depende da faixa de consumo estimada pela receita (Passo 8). A parte DMR é o valor
-  oficial; SCEE - Baixa Renda(\*) é a diferença atribuída à energia compensada dos clientes Baixa
-  Renda com geração distribuída, que o BW não identifica. A DMR precisa ser incluída todo mês em `src/dmr_tarifa_social.csv`.
-- Nem todo desconto da diferença é bancado pela CDE (Conta de Desenvolvimento Energético). A Tarifa
-  Social e o desconto de fonte incentivada são; a isenção do APE e o ajuste da 2ª passada precisam
-  ser lidos à parte.
+  oficial; SCEE - Baixa Renda é a diferença atribuída à energia compensada dos clientes Baixa Renda
+  com geração distribuída, que o BW não identifica. A DMR precisa ser incluída todo mês em
+  `src/dmr_tarifa_social.csv`.
+- A diferença mostra só o que a CDE (Conta de Desenvolvimento Energético) reembolsa: Tarifa Social e
+  desconto de fonte incentivada. O ajuste da 2ª passada não é desconto e é lido à parte.
 
 ---
 

@@ -98,7 +98,7 @@ SP/BW/
 | [`1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md`](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md) | Cada transformação do notebook e dos scripts, e o motivo dela. |
 | `2-Checks/resultados/` | Conferências mensais contra o Mercado Receita e a conferência contra o informe de gestão. |
 | `2-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês. |
-| `2-Checks/receita_faturada_Bl1_vs_Bl2/` | Um arquivo por mês com o layout pela tarifa homologada (bloco 1) e pela tarifa realizada (bloco 2), a diferença por fórmula e a diferença separada em APE, fonte incentivada e 2ª passada, e o consolidado com uma linha por mês (seção 5.4). |
+| `2-Checks/receita_faturada_Bl1_vs_Bl2/` | Um arquivo por mês com o layout pela tarifa homologada (bloco 1) e pela tarifa realizada (bloco 2), a diferença por fórmula e a diferença separada em Tarifa Social – DMR, fonte incentivada e 2ª passada (isenção de encargos do APE e SCEE - Baixa Renda só como memória na conciliação), e o consolidado com uma linha por mês (seção 5.4). |
 | `2-Checks/tabelas_readme/` | `tabelas_readme.md` e `tabelas_readme.xlsx`: as tabelas de resultados da seção 5 (5.1, 5.3 e 5.4), geradas por `3-Py/readme/tabelas_readme.ipynb`. No Excel, uma aba por tabela com a explicação e a seção correspondente. Fora do Git. |
 | `2-Checks/consolidado_*.xlsx` | Checks por família e camada e por opção de compra e subgrupo, consolidados mês a mês (seção 5.3). |
 | [`3-Py/1-Entrega/prepara_base_bw.py`](3-Py/1-Entrega/prepara_base_bw.py) | Converte a extração mensal do BW (csv de mais de 200 MB) em parquet limpo em `src/parquet/`, confere o total contra o próprio csv, compacta o csv em `src/csv_original/` e o apaga. Roda antes do notebook. |
@@ -541,10 +541,17 @@ de compra e subgrupo, em `2-Checks/consolidado_check_mr_bloco2_2026-01_a_2026-05
 
 ### 5.4 Tarifa homologada × tarifa realizada: onde estão os descontos
 
-O script `3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py` monta o layout Receita Faturada pelo
-bloco 1 (tarifa homologada sem os descontos) e pelo bloco 2 (tarifa realizada, a entrega) e separa a
-diferença em Tarifa Social – DMR, SCEE - Baixa Renda(\*), APE, fonte incentivada e 2ª passada, item a item. A DMR
-faturada do mês vem de `src/dmr_tarifa_social.csv` (informe de gestão). Regras e limites no
+O script `3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py` monta o layout Receita Faturada pela
+tarifa homologada e pelo bloco 2 (tarifa realizada, a entrega) e separa a diferença em Tarifa Social –
+DMR, fonte incentivada e 2ª passada, item a item. A tarifa homologada é o bloco 1 sem as duas parcelas
+que não são reembolsadas pela CDE, que ficam só como memória:
+
+- **Isenção de encargos (APE):** com base no PRORET 5.2 (§81 e §91), o consumo isento de encargos sai do
+  mercado de rateio da cota da CDE e não é reembolsado. Esses encargos simplesmente não são cobrados
+  desse cliente, e o custo fica com os demais consumidores pelo rateio da cota.
+- **SCEE - Baixa Renda:** é a TE do SCEE, homologada no reajuste, aplicada sobre a energia compensada.
+
+A DMR faturada do mês vem de `src/dmr_tarifa_social.csv` (informe de gestão). Regras e limites no
 [procedimento](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md), seção "Check tarifa homologada × tarifa
 realizada".
 
@@ -553,34 +560,33 @@ Diferença tarifa homologada − tarifa realizada (R$ milhões; positivo = desco
 | | jan | fev | mar | abr | mai | jun | jul | ago |
 |---|---|---|---|---|---|---|---|---|
 | Tarifa Social – DMR | 37,3 | 34,5 | 33,3 | 32,7 | 32,9 | 31,9 | 37,5 | 42,7 |
-| SCEE - Baixa Renda(*) | 1,5 | 2,6 | 2,7 | 3,4 | 2,7 | 2,8 | 3,1 | 2,8 |
-| APE | 9,9 | 16,1 | 14,7 | 9,2 | 11,0 | 13,0 | 13,1 | 16,1 |
 | Fonte incentivada | 63,0 | 63,5 | 64,1 | 66,3 | 63,0 | 62,9 | 63,8 | 72,8 |
 | 2ª passada | −0,3 | −0,8 | −1,4 | −1,5 | 0,9 | −1,2 | 2,3 | 2,3 |
 | dela, TUSD Consumo Próprio não faturada | 1,6 | 1,4 | 0,7 | 0,9 | 2,6 | 0,7 | 0,8 | 3,3 |
 | dela, demais grupos | −1,9 | −2,2 | −2,2 | −2,3 | −1,7 | −1,9 | 1,5 | −1,0 |
-| **Total** | **111,4** | **116,0** | **113,3** | **110,1** | **110,6** | **109,5** | **119,8** | **136,7** |
+| **Total** | **100,0** | **97,3** | **96,0** | **97,5** | **96,9** | **93,7** | **103,6** | **117,8** |
+| Retiradas da tarifa homologada (memória): |  |  |  |  |  |  |  |  |
+| SCEE - Baixa Renda | 1,5 | 2,6 | 2,7 | 3,4 | 2,7 | 2,8 | 3,1 | 2,8 |
+| Isenção de encargos (APE) | 9,9 | 16,1 | 14,7 | 9,2 | 11,0 | 13,0 | 13,1 | 16,1 |
+| **Bloco 1 − tarifa realizada** | **111,4** | **116,0** | **113,3** | **110,1** | **110,6** | **109,5** | **119,8** | **136,7** |
 
-O total é a linha (c) da seção 5.1, a menos do resíduo; Tarifa Social – DMR mais SCEE - Baixa
-Renda(\*), APE, fonte incentivada e 2ª passada são as linhas (d), (e), (f) e (g) com o sinal invertido.
+A linha "Bloco 1 − tarifa realizada" é a linha (c) da seção 5.1, a menos do resíduo; Tarifa Social –
+DMR mais SCEE - Baixa Renda, isenção de encargos (APE), fonte incentivada e 2ª passada são as linhas (d),
+(e), (f) e (g) com o sinal invertido.
 
 Leitura:
 
 - **Fonte incentivada.** Cai só nos itens de rede: em maio, Parcela B (Fio B) R$ 37,9 milhões, Rede
   Básica R$ 24,2 milhões, Conexão T R$ 1,1 milhão e CUSD R$ 0,2 milhão.
-- **APE.** Cai só nos encargos: em maio, CDE USO R$ 8,8 milhões e PROINFA R$ 1,6 milhão.
 - **Tarifa Social.** A linha DMR é o subsídio homologado: R$ 282,9 milhões de janeiro a agosto.
-- **SCEE - Baixa Renda(\*).** Não é subsídio homologado com a DMR: R$ 21,7 milhões no período, estável em
-  cerca de R$ 2,7 milhões por mês. Nos clientes Baixa Renda com geração distribuída, a energia
-  compensada é faturada pela TE do SCEE, sem o componente de energia (R$ 37,19 contra R$ 316,78/MWh;
-  REN 1.000/2021, art. 655-I), e o benefício da Tarifa Social também incide sobre ela (art. 655-G, §8º).
-  O BW não identifica essa energia, que é valorizada pela TE comum. Energia e receita da Baixa Renda no
-  BW batem com o informe de gestão; a diferença está só na tarifa.
-- **Tarifa Social + SCEE - Baixa Renda(\*)** (R$ 304,6 milhões, a faixa gratuita calculada) cai em todos
-  os itens:
-  Compra de Energia R$ 128,0 milhões, Parcela B R$ 112,5 milhões, Perdas R$ 23,8 milhões, Rede Básica
-  R$ 23,2 milhões no período.
-- **Fora do check.** Desconto Social, isenção de encargos da Baixa Renda e as tarifas próprias das
+- **Isenção de encargos (APE), fora da análise.** Cai só nos encargos: em maio, CDE USO R$ 8,8 milhões e
+  PROINFA R$ 1,6 milhão.
+- **SCEE - Baixa Renda, fora da análise.** R$ 21,7 milhões no período, estável em cerca de R$ 2,7 milhões
+  por mês. Nos clientes Baixa Renda com geração distribuída, a energia compensada é faturada pela TE do
+  SCEE (R$ 37,19 contra R$ 316,78/MWh; REN 1.000/2021, art. 655-I), e o benefício da Tarifa Social
+  também incide sobre ela (art. 655-G, §8º). O BW não identifica essa energia, que é valorizada pela TE
+  comum; a diferença para a DMR está só na tarifa.
+- **Também fora do check.** Desconto Social, isenção de encargos da Baixa Renda e as tarifas próprias das
   subclasses ficam no bloco 1 e não aparecem na diferença: não são reembolsados pela CDE.
 - **Consumo Próprio.** A 2ª passada do Consumo Próprio cativo é de R$ 2,6 milhões em maio: a tarifa
   cheia dá R$ 5,2 milhões e o faturado é R$ 2,6 milhões. A diferença é a TUSD, que a Empresa não
