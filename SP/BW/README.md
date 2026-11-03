@@ -61,6 +61,7 @@ SP/BW/
 │   ├── resultados/               um arquivo de conferência por mês
 │   ├── receita_faturada_MR/      layout Receita Faturada do MR e check PxQ − MR, por mês
 │   ├── receita_faturada_Bl1_vs_Bl2/  tarifa homologada × tarifa realizada e descontos por origem
+│   ├── check_subsidios_vs_basefaturamento_*.xlsx  subsídios do faturamento × Bl1 × Bl2
 │   ├── tabelas_readme/           tabelas da seção 5 deste documento (.md e .xlsx)
 │   └── consolidado_*.xlsx        consolidados mês a mês
 ├── 3-Py/                         todos os scripts Python, separados pela pasta que alimentam
@@ -75,7 +76,8 @@ SP/BW/
 │   │   ├── check_mr_camadas.py       check por família e camada
 │   │   ├── consolida_check_mr_bloco2.py  consolida o check por subgrupo
 │   │   ├── gera_receita_faturada_mr.py   layout Receita Faturada do MR e check célula a célula
-│   │   └── gera_receita_faturada_bl1_vs_bl2.py  tarifa homologada × tarifa realizada (descontos)
+│   │   ├── gera_receita_faturada_bl1_vs_bl2.py  tarifa homologada × tarifa realizada (descontos)
+│   │   └── check_subsidios_vs_basefaturamento.py  subsídios do faturamento × Bl1 × Bl2
 │   └── readme/
 │       └── tabelas_readme.ipynb      gera as tabelas de resultados da seção 5
 ├── tbl/
@@ -86,6 +88,7 @@ SP/BW/
 │   └── calendario/de_para_lote.csv  lote do BW -> lote do calendário de leitura
 └── src/                          arquivos de origem (não editados pelo processo)
     ├── csv_original/             extração mensal do BW, csv compactado (MM-AAAA_ENEL SP_RECEITA.zip)
+    ├── MM-AAAA_ENEL SP_RECEITA_com BAIXA RENDA E FONTE INCENTIVADA.csv  subsídios do faturamento
     └── parquet/                  a mesma extração em parquet limpo, lida pelo notebook
 ```
 
@@ -99,13 +102,14 @@ SP/BW/
 | `2-Checks/resultados/` | Conferências mensais contra o Mercado Receita e a conferência contra o informe de gestão. |
 | `2-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês. |
 | `2-Checks/receita_faturada_Bl1_vs_Bl2/` | Um arquivo por mês com o layout pela tarifa homologada (bloco 1) e pela tarifa realizada (bloco 2), a diferença por fórmula e a diferença separada em Tarifa Social – DMR, fonte incentivada e 2ª passada (isenção de encargos do APE e SCEE - Baixa Renda só como memória na conciliação), e o consolidado com uma linha por mês (seção 5.4). |
+| `2-Checks/check_subsidios_vs_basefaturamento_<ini>_a_<fim>.xlsx` | Subsídios concedidos, mês a mês, pelo relatório do sistema de faturamento contra o Bl1 × Bl2, por item, tipo de cliente e classe, em MR$ (seção 5.4). |
 | `2-Checks/tabelas_readme/` | `tabelas_readme.md` e `tabelas_readme.xlsx`: as tabelas de resultados da seção 5 (5.1, 5.3 e 5.4), geradas por `3-Py/readme/tabelas_readme.ipynb`. No Excel, uma aba por tabela com a explicação e a seção correspondente. Fora do Git. |
 | `2-Checks/consolidado_*.xlsx` | Checks por família e camada e por opção de compra e subgrupo, consolidados mês a mês (seção 5.3). |
 | [`3-Py/1-Entrega/prepara_base_bw.py`](3-Py/1-Entrega/prepara_base_bw.py) | Converte a extração mensal do BW (csv de mais de 200 MB) em parquet limpo em `src/parquet/`, confere o total contra o próprio csv, compacta o csv em `src/csv_original/` e o apaga. Roda antes do notebook. |
 | [`3-Py/1-Entrega/extrai_pcat.py`](3-Py/1-Entrega/extrai_pcat.py) | Lê os PCATs (planilhas de cálculo tarifário da ANEEL) e grava `tbl/tarifas/tarifa_long.csv`. Roda uma vez a cada nova vigência tarifária. |
 | [`3-Py/1-Entrega/gera_calendario_leitura.py`](3-Py/1-Entrega/gera_calendario_leitura.py) | Lê o calendário de leitura (`src/calendario_leitura_<ano>.xlsx`, uma aba por mês) e grava `tbl/calendario/calendario_leitura.csv`: `python 3-Py/1-Entrega/gera_calendario_leitura.py 2026`. Carrega só as abas presentes e substitui apenas esses meses na tabela. |
 | [`3-Py/1-Entrega/gera_receita_faturada.py`](3-Py/1-Entrega/gera_receita_faturada.py) | Converte o pxq no layout Receita Faturada: `python 3-Py/1-Entrega/gera_receita_faturada.py 2026-06` ou `--todos`. |
-| [`3-Py/2-Checks/`](3-Py/2-Checks/) | `check_mr_bloco2.py` compara o mês por opção de compra e subgrupo. `check_mr_camadas.py` compara por família e camada, mês a mês. `consolida_check_mr_bloco2.py` consolida vários meses. `le_mr.py` lê o Mercado Receita (também usado pelos checks do SAMP). `gera_receita_faturada_mr.py` monta o Mercado Receita no layout Receita Faturada e gera o check célula a célula: `python 3-Py/2-Checks/gera_receita_faturada_mr.py 2026-05` ou `--todos`. `gera_receita_faturada_bl1_vs_bl2.py` compara a tarifa homologada com a realizada e separa os descontos: `python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py --todos`. |
+| [`3-Py/2-Checks/`](3-Py/2-Checks/) | `check_mr_bloco2.py` compara o mês por opção de compra e subgrupo. `check_mr_camadas.py` compara por família e camada, mês a mês. `consolida_check_mr_bloco2.py` consolida vários meses. `le_mr.py` lê o Mercado Receita (também usado pelos checks do SAMP). `gera_receita_faturada_mr.py` monta o Mercado Receita no layout Receita Faturada e gera o check célula a célula: `python 3-Py/2-Checks/gera_receita_faturada_mr.py 2026-05` ou `--todos`. `gera_receita_faturada_bl1_vs_bl2.py` compara a tarifa homologada com a realizada e separa os descontos: `python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py --todos`. `check_subsidios_vs_basefaturamento.py` compara os subsídios do Bl1 × Bl2 com o relatório do faturamento: `python 3-Py/2-Checks/check_subsidios_vs_basefaturamento.py 2026-01 2026-09`. |
 | [`3-Py/readme/tabelas_readme.ipynb`](3-Py/readme/tabelas_readme.ipynb) | Gera as tabelas da seção 5 deste documento a partir do pxq e dos checks. O período de cada tabela e a opção de rodar os checks antes ficam no Passo 0. O texto de leitura continua manual. |
 | `tbl/` | Tabelas do processo: tarifas homologadas, calendário de leitura e o modelo do layout Receita Faturada. |
 | `tbl/calendario/` | `calendario_leitura.csv`: uma linha por mês, grupo e lote, com a data de leitura, os dias de consumo e o início e fim do ciclo. `de_para_lote.csv`: o grupo e o nº do lote do calendário para cada lote do BW (campo `Conjunto de Contrato`), validado pela área do BW. Ambos em csv para facilitar a passagem para a TI. |
@@ -590,6 +594,16 @@ Leitura:
   SCEE (R$ 37,19 contra R$ 316,78/MWh; REN 1.000/2021, art. 655-I), e o benefício da Tarifa Social
   também incide sobre ela (art. 655-G, §8º). O BW não identifica essa energia, que é valorizada pela TE
   comum; a diferença para a DMR está só na tarifa.
+- **TOI.** O subsídio só é calculado para o TOI (CNR) da Baixa Renda: a faixa gratuita da Tarifa
+  Social é estimada também nas linhas de CNR da Baixa Renda, e o desconto de fonte incentivada não é
+  aplicado no TOI. O relatório do faturamento segue a mesma regra (ago: Tarifa Social no TOI 0,09 MR$
+  no P × Q e 0,10 MR$ no relatório; nenhum desconto de fonte incentivada no TOI).
+- **Conferência com o faturamento.** O script `check_subsidios_vs_basefaturamento.py` compara as duas
+  linhas reembolsáveis com o relatório de subsídios do sistema de faturamento (ZREDU4 = Tarifa Social;
+  ZTUS98 + ZTUS99 = fonte incentivada), por tipo de cliente e classe, em MR$. De janeiro a agosto o
+  relatório fica 10,35 MR$ acima: fonte incentivada 5,82 MR$ (quase tudo Comercial e Industrial livres)
+  e Tarifa Social 4,53 MR$. Os dois lados somam FAT, REFAT e TOI; não há abertura por tipo de
+  faturamento.
 - **Também fora do check.** Desconto Social, isenção de encargos da Baixa Renda e as tarifas próprias das
   subclasses ficam no bloco 1 e não aparecem na diferença: não são reembolsados pela CDE.
 - **Consumo Próprio.** A 2ª passada do Consumo Próprio cativo é de R$ 2,6 milhões em maio: a tarifa

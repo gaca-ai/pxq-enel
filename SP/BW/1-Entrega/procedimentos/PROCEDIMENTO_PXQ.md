@@ -827,6 +827,10 @@ de opção × classe × unidade.
 
 **Limites do check**
 
+- O subsídio só é calculado para o TOI (CNR) da Baixa Renda: a faixa gratuita da Tarifa Social é
+  estimada também nas linhas de CNR da Baixa Renda, e o desconto de fonte incentivada não é aplicado
+  no TOI (Passos 8 e 9).
+
 - O Desconto Social, a isenção de encargos da Baixa Renda e as tarifas próprias das subclasses
   (rural, irrigante) continuam dentro do bloco 1 e não aparecem na diferença. Os dois primeiros não
   são reembolsados pela CDE (Passo 8).
@@ -836,6 +840,45 @@ de opção × classe × unidade.
   `src/dmr_tarifa_social.csv`.
 - A diferença mostra só o que a CDE (Conta de Desenvolvimento Energético) reembolsa: Tarifa Social e
   desconto de fonte incentivada. O ajuste da 2ª passada não é desconto e é lido à parte.
+
+---
+
+## Check dos subsídios contra o relatório do faturamento
+
+O script `3-Py/2-Checks/check_subsidios_vs_basefaturamento.py` compara, mês a mês, os subsídios do
+check tarifa homologada × tarifa realizada com o relatório de subsídios do sistema de faturamento, por
+item, tipo de cliente e classe.
+
+```
+python 3-Py/2-Checks/check_subsidios_vs_basefaturamento.py 2026-01 2026-09
+```
+
+Entradas: `src/MM-AAAA_ENEL SP_RECEITA_com BAIXA RENDA E FONTE INCENTIVADA.csv` (relatório do time de
+faturamento, um por mês, fora do Git) e os arquivos mensais de `2-Checks/receita_faturada_Bl1_vs_Bl2/`.
+Saída: `2-Checks/check_subsidios_vs_basefaturamento_<ini>_a_<fim>.xlsx`, em MR$, com as abas `Leia-me`,
+`Comparacao` (relatório, Bl1 × Bl2 e delta por mês, acumulado e delta %) e `Delta_MR$`.
+
+**Regras**
+
+1. Itens: Tarifa Social = ZREDU4 do relatório contra a linha Tarifa Social – DMR do Bl1 × Bl2; fonte
+   incentivada = ZTUS98 (energia) + ZTUS99 (demanda) contra a linha fonte incentivada. Positivo =
+   desconto concedido; o sinal do ZTUS, negativo no relatório, é invertido.
+2. Do relatório soma-se a coluna "Montante variável", sem as linhas de subtotal ("Resultado" e
+   "Result.global").
+3. Tipo de cliente: Cliente Cativo = CATIVO; Cliente Livre e Cliente Híbrido = LIVRE, como no layout.
+4. Classe no padrão do layout Receita Faturada: Residencial com Baixa Renda, BPC, Indígena, Quilombola
+   ou Desconto Social vai para Residencial Baixa Renda.
+5. Do Bl1 × Bl2 somam-se as colunas tarifárias (Parcela B a Base CVA) das linhas D e E.
+6. Sem abertura por tipo de faturamento: os dois lados somam FAT, REFAT e TOI do mês contábil. O
+   subsídio só é calculado para o TOI da Baixa Renda, nos dois lados.
+7. Mês sem um dos arquivos: o lado ausente fica em branco, com aviso, e o mês sai do acumulado.
+
+**Limites do check**
+
+- A Tarifa Social do Bl1 × Bl2 é a DMR do informe de gestão, que não abre por classe: fica toda em
+  Residencial Baixa Renda. A abertura por classe só traz informação nova na fonte incentivada.
+- O sinal positivo do ZREDU4 no relatório foi lido como o valor do desconto concedido; confirmar com o
+  time de faturamento.
 
 ---
 
