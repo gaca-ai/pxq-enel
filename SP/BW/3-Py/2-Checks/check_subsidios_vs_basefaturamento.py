@@ -12,7 +12,9 @@ Usage:
     python check_subsidios_vs_basefaturamento.py 2026-01 2026-08
 Reads  src/MM-AAAA_ENEL SP_RECEITA_com BAIXA RENDA E FONTE INCENTIVADA.csv (billing team)
        2-Checks/receita_faturada_Bl1_vs_Bl2/receita_faturada_Bl1_vs_Bl2_<ref>.xlsx
-Writes 2-Checks/check_subsidios_vs_basefaturamento_<ini>_a_<fim>.xlsx (MR$)
+Writes 2-Checks/check_subsidios_vs_basefaturamento_<ini>_a_<fim>.xlsx (MR$), in the layout requested by the
+       area (model "Comparativo"): sheets Total, Tarifa Social and Fonte incentivada, each with the blocks
+       Base Faturamento, PxQ and Delta, months Jan-Dec + YTD (B2 = last closed month), live formulas
 
 Rules:
 - Report: sum of "Montante variável"; subtotal rows ("Resultado", "Result.global") are dropped.
@@ -28,7 +30,7 @@ import os
 import sys
 from pathlib import Path
 
-import numpy as np
+import openpyxl
 import pandas as pd
 from openpyxl.styles import Alignment, Font
 
@@ -104,97 +106,183 @@ def le_bl(ref):
     return pd.concat(partes).groupby(CHAVE)["v"].sum()
 
 
+GRUPOS = [("CATIVO", "Cativo"), ("LIVRE", "Livre")]
+# class order and labels requested by the area (Residencial Baixa Renda right after Residencial)
+ORDEM_CLASSE = ["Residencial", "Residencial Baixa Renda", "Industrial", "Comercial", "Rural", "Poder Público",
+                "Iluminação Pública", "Serviço Público", "Consumo Próprio", "Suprimento", "Uso Distribuição",
+                "Uso Geração"]
+ROTULO_CLASSE = {"Poderes Públicos": "Poder Público", "Serviços Públicos": "Serviço Público"}
+ABAS = [("Total", ["Tarifa Social", "Fonte incentivada"]), ("Tarifa Social", ["Tarifa Social"]),
+        ("Fonte incentivada", ["Fonte incentivada"])]
+MIN_MR = 0.0005                    # a class row is kept when some month has at least R$ 500 on either side
+FMT = '#,##0.00;-#,##0.00;"-"'
+
 rel = {ref: le_relatorio(ref) for ref in REFS}
 bl = {ref: le_bl(ref) for ref in REFS}
-indice = sorted(set().union(*[s.index for s in list(rel.values()) + list(bl.values()) if s is not None]))
-# keep only keys with value on some side
-cols, delta = {}, {}
-for ref in REFS:
-    r = rel[ref].reindex(indice) if rel[ref] is not None else pd.Series(np.nan, index=pd.MultiIndex.from_tuples(indice))
-    b = bl[ref].reindex(indice) if bl[ref] is not None else pd.Series(np.nan, index=pd.MultiIndex.from_tuples(indice))
-    if rel[ref] is not None:
-        r = r.fillna(0.0)
-    if bl[ref] is not None:
-        b = b.fillna(0.0)
-    cols[f"{ref} Relatório"], cols[f"{ref} Bl1×Bl2"], cols[f"{ref} Δ"] = r.values, b.values, (r - b).values
-    delta[ref] = (r - b).values
-comp = pd.DataFrame(cols, index=pd.MultiIndex.from_tuples(indice, names=CHAVE))
-comp = comp[comp.abs().sum(axis=1) > 0.0005]
 ok = [ref for ref in REFS if rel[ref] is not None and bl[ref] is not None]   # months with both sides
-comp["Acumulado Relatório"] = comp[[f"{r} Relatório" for r in ok]].sum(axis=1)
-comp["Acumulado Bl1×Bl2"] = comp[[f"{r} Bl1×Bl2" for r in ok]].sum(axis=1)
-comp["Acumulado Δ"] = comp["Acumulado Relatório"] - comp["Acumulado Bl1×Bl2"]
-comp["Acumulado Δ %"] = (comp["Acumulado Δ"] / comp["Acumulado Bl1×Bl2"].abs()).where(comp["Acumulado Bl1×Bl2"].abs() > 1e-6)
+ultimo = ok[-1] if ok else REFS[0]
+ANO = int(REFS[0][:4])
+MESES = [f"{ANO}-{m:02d}" for m in range(1, 13)]                  # calendar-year columns, as in the model
 
 
-def com_totais(df):
-    """Subtotal per item and grand total rows."""
-    blocos = []
-    for item, g in df.groupby(level=0, sort=False):
-        blocos.append(g)
-        s = g.sum(min_count=1).to_frame().T
-        s.index = pd.MultiIndex.from_tuples([(item, "Total", "")], names=CHAVE)
-        blocos.append(s)
-    t = df.sum(min_count=1).to_frame().T
-    t.index = pd.MultiIndex.from_tuples([("TOTAL", "", "")], names=CHAVE)
-    out = pd.concat(blocos + [t])
-    if "Acumulado Δ %" in out:
-        out["Acumulado Δ %"] = (out["Acumulado Δ"] / out["Acumulado Bl1×Bl2"].abs()).where(
-            out["Acumulado Bl1×Bl2"].abs() > 1e-6)
+def valores(lado, itens):
+    """{month: Series indexed by (type, class)} of one side for the given items (None = no file)."""
+    out = {}
+    for ref in MESES:
+        s = lado.get(ref)
+        if s is None:
+            out[ref] = None
+            continue
+        s = s[s.index.get_level_values(0).isin(itens)]
+        s = s.rename(index=ROTULO_CLASSE, level=2)
+        out[ref] = s.groupby(level=[1, 2]).sum()
     return out
 
 
-comp_t = com_totais(comp)
-dlt = comp[[f"{r} Δ" for r in REFS] + ["Acumulado Δ"]]
-dlt.columns = REFS + ["Acumulado"]
-dlt_t = com_totais(dlt)
+def linhas_aba(base, pxq):
+    """Class rows with value in some month on either side, grouped by customer type, in the layout order."""
+    vistos = {}
+    for lado in (base, pxq):
+        for s in lado.values():
+            if s is None:
+                continue
+            for k, v in s.items():
+                vistos[k] = max(vistos.get(k, 0.0), abs(v))
+    grupos = []
+    for tipo, rotulo in GRUPOS:
+        cls = [c for (t, c), m in vistos.items() if t == tipo and m >= MIN_MR]
+        cls.sort(key=lambda c: (ORDEM_CLASSE.index(c) if c in ORDEM_CLASSE else len(ORDEM_CLASSE), c))
+        if cls:
+            grupos.append((tipo, rotulo, cls))
+    outros = sorted({t for (t, _), m in vistos.items() if m >= MIN_MR} - {t for t, _ in GRUPOS})
+    if outros:
+        print(f"ATENCAO: tipos de cliente fora de Cativo/Livre ignorados: {outros}")
+    return grupos
+
+
+def escreve_aba(ws, base, pxq):
+    """Model layout: B2 = last closed month; blocks Base Faturamento, PxQ and Delta (Base - PxQ)."""
+    from openpyxl.utils import get_column_letter as L
+    grupos = linhas_aba(base, pxq)
+    col = {ref: 3 + k for k, ref in enumerate(MESES)}                # C..N
+    c_ytd = 15                                                       # O
+    ws["B2"] = pd.Timestamp(f"{ultimo}-01").to_pydatetime()
+    ws["B2"].number_format = "dd/mm/yyyy"
+    ws["B2"].font = Font(bold=True)
+    for ref, c in col.items():
+        ws.cell(3, c, f'=IF({L(c)}4>$B$2,"YTG","YTD")').alignment = Alignment(horizontal="center")
+
+    def bloco(r0, titulo, lado=None, ref_bloco=None):
+        """Header at row r0; returns {row key: row number} and the last row."""
+        ws.cell(r0, 2, titulo).font = Font(bold=True)
+        for ref, c in col.items():
+            cel = ws.cell(r0, c, pd.Timestamp(f"{MESES[0]}-01").to_pydatetime() if c == 3 else f"=EDATE({L(c - 1)}{r0},1)")
+            cel.number_format = "mmm/yy"
+            cel.font = Font(bold=True)
+            cel.alignment = Alignment(horizontal="center")
+        ws.cell(r0, c_ytd, "YTD").font = Font(bold=True)
+        pos, r = {}, r0 + 1
+        pos["TOTAL"] = r
+        r += 1
+        for tipo, rotulo, cls in grupos:
+            pos[tipo] = r
+            r += 1
+            for c_ in cls:
+                pos[(tipo, c_)] = r
+                r += 1
+        ultima = r - 1
+        # labels
+        ws.cell(pos["TOTAL"], 2, "Total").font = Font(bold=True)
+        for tipo, rotulo, cls in grupos:
+            ws.cell(pos[tipo], 2, rotulo).font = Font(bold=True)
+            for c_ in cls:
+                ws.cell(pos[(tipo, c_)], 2, c_)
+        # values / formulas
+        for ref, c in list(col.items()) + [(None, c_ytd)]:
+            X = L(c)
+            tem = ref is None or (lado is not None and lado[ref] is not None) or (
+                ref_bloco is not None and ref in ok)
+            if not tem:
+                continue
+            for tipo, rotulo, cls in grupos:
+                for c_ in cls:
+                    rr = pos[(tipo, c_)]
+                    if ref_bloco is not None:                         # Delta block
+                        f = f"={X}{ref_bloco[0][(tipo, c_)]}-{X}{ref_bloco[1][(tipo, c_)]}"
+                    elif ref is None:
+                        f = f'=SUMIF({L(3)}$3:{L(14)}$3,"YTD",{L(3)}{rr}:{L(14)}{rr})'
+                    else:
+                        f = float(lado[ref].get((tipo, c_), 0.0))
+                    ws.cell(rr, c, f)
+                ini, fim = pos[(tipo, cls[0])], pos[(tipo, cls[-1])]
+                ws.cell(pos[tipo], c, f"=SUM({X}{ini}:{X}{fim})" if ref_bloco is None
+                        else f"={X}{ref_bloco[0][tipo]}-{X}{ref_bloco[1][tipo]}").font = Font(bold=True)
+            ws.cell(pos["TOTAL"], c, ("=SUM(" + ",".join(f"{X}{pos[t]}" for t, _, _ in grupos) + ")") if ref_bloco is None
+                    else f"={X}{ref_bloco[0]['TOTAL']}-{X}{ref_bloco[1]['TOTAL']}").font = Font(bold=True)
+        for row in ws.iter_rows(min_row=r0 + 1, max_row=ultima, min_col=3, max_col=c_ytd):
+            for cel in row:
+                cel.number_format = FMT
+        return pos, ultima
+
+    pos_b, fim_b = bloco(4, "Base Faturamento", lado=base)
+    ws.cell(fim_b + 3, 2, "* Comparativo dos subsídios concedidos (MR$)").font = Font(italic=True)
+    r_flag = fim_b + 5
+    for ref, c in col.items():
+        ws.cell(r_flag, c, f"={L(c)}$3").alignment = Alignment(horizontal="center")
+    pos_p, fim_p = bloco(r_flag + 1, "PxQ", lado=pxq)
+    bloco(fim_p + 6, "Delta", ref_bloco=(pos_b, pos_p))
+    ws.column_dimensions["A"].width = 3
+    ws.column_dimensions["B"].width = 26
+    for c in range(3, c_ytd + 1):
+        ws.column_dimensions[L(c)].width = 11
+
 
 LEIA_ME = [
-    "Check dos subsídios concedidos: relatório do sistema de faturamento x Bl1 x Bl2 (tarifa homologada x realizada)",
+    "Check dos subsídios concedidos: relatório do sistema de faturamento (Base Faturamento) x Bl1 x Bl2 (PxQ)",
     "",
-    "Valores em MR$ (milhões de reais). Positivo = desconto concedido. Δ = relatório - Bl1 x Bl2.",
-    "Itens: Tarifa Social = ZREDU4 (relatório) x Tarifa Social - DMR (Bl1 x Bl2);",
+    "Valores em MR$ (milhões de reais). Positivo = desconto concedido. Delta = Base Faturamento - PxQ.",
+    "Abas: Total (Tarifa Social + fonte incentivada), Tarifa Social e Fonte incentivada.",
+    "Tarifa Social = ZREDU4 (relatório) x Tarifa Social - DMR (Bl1 x Bl2);",
     "fonte incentivada = ZTUS98 + ZTUS99 (relatório, sinal invertido) x fonte incentivada (Bl1 x Bl2).",
-    "Tipo de cliente: Cliente Cativo = CATIVO; Cliente Livre e Cliente Híbrido = LIVRE.",
+    "Tipo de cliente: Cliente Cativo = Cativo; Cliente Livre e Cliente Híbrido = Livre.",
     "Classe no padrão do layout Receita Faturada (Baixa Renda, BPC, Indígena, Quilombola e Desconto Social em",
-    "Residencial Baixa Renda).",
+    "Residencial Baixa Renda). Só aparecem as classes com valor em algum mês.",
+    "",
+    "B2 = último mês fechado (último mês com os dois lados). Meses até B2 = YTD; seguintes = YTG.",
+    "A coluna YTD soma só os meses YTD. Mês sem arquivo de um dos lados fica em branco; o Delta só é",
+    "calculado nos meses com os dois lados. B2 pode ser alterado à mão.",
     "",
     "SEM ABERTURA POR TIPO DE FATURAMENTO: os dois lados somam faturamento normal (FAT), refaturamento (REFAT)",
     "e TOI (CNR) do mês contábil. Não há separação entre FAT, REFAT e TOI nesta planilha.",
+    "O subsídio só é calculado para o TOI da Baixa Renda (Tarifa Social); a fonte incentivada não se aplica",
+    "ao TOI, nos dois lados.",
     "",
     "A Tarifa Social do Bl1 x Bl2 é a DMR do informe de gestão, que não abre por classe: fica toda em",
     "Residencial Baixa Renda. A abertura por classe só traz informação nova na fonte incentivada.",
-    "Mês sem arquivo do Bl1 x Bl2 (ou do relatório): o lado ausente fica em branco e o mês sai do acumulado.",
     "",
-    f"Meses no acumulado: {', '.join(ok) if ok else 'nenhum'}",
+    f"Meses com os dois lados: {', '.join(ok) if ok else 'nenhum'}",
     "Fontes: src/MM-AAAA_ENEL SP_RECEITA_com BAIXA RENDA E FONTE INCENTIVADA.csv e "
     "2-Checks/receita_faturada_Bl1_vs_Bl2/receita_faturada_Bl1_vs_Bl2_<ref>.xlsx",
     "Gerado por 3-Py/2-Checks/check_subsidios_vs_basefaturamento.py",
 ]
 
-with pd.ExcelWriter(SAIDA, engine="openpyxl") as w:
-    pd.DataFrame({"Leia-me": LEIA_ME}).to_excel(w, sheet_name="Leia-me", index=False)
-    comp_t.to_excel(w, sheet_name="Comparacao")
-    dlt_t.to_excel(w, sheet_name="Delta_MR$")
-    w.book["Leia-me"].column_dimensions["A"].width = 115
-    for nome in ("Comparacao", "Delta_MR$"):
-        ws = w.book[nome]
-        for L, larg in zip("ABC", (18, 16, 26)):
-            ws.column_dimensions[L].width = larg
-        ultima = ws.max_column
-        for c in ws[1]:
-            c.font = Font(bold=True)
-            c.alignment = Alignment(wrap_text=True, horizontal="center")
-        for row in ws.iter_rows(min_row=2):
-            negrito = row[1].value == "Total" or row[0].value == "TOTAL"
-            for cel in row:
-                if cel.column > 3:
-                    pct = nome == "Comparacao" and cel.column == ultima
-                    cel.number_format = "0.0%" if pct else "#,##0.00"
-                if negrito:
-                    cel.font = Font(bold=True)
-        ws.freeze_panes = None
+wb = openpyxl.Workbook()
+ws = wb.active
+ws.title = "Leia-me"
+for linha in LEIA_ME:
+    ws.append([linha])
+ws["A1"].font = Font(bold=True)
+ws.column_dimensions["A"].width = 115
+resumo = []
+for nome, itens in ABAS:
+    base, pxq = valores(rel, itens), valores(bl, itens)
+    escreve_aba(wb.create_sheet(nome), base, pxq)
+    b = sum(base[r].sum() for r in ok)
+    x = sum(pxq[r].sum() for r in ok)
+    resumo.append((nome, b, x, b - x))
+wb.save(SAIDA)
 
-pd.set_option("display.width", 220)
-print(dlt_t.round(2).to_string())
-print(f"\nsaida: {SAIDA}")
+print(f"YTD ate {ultimo} (MR$):")
+for nome, b, x, d in resumo:
+    print(f"  {nome:18s} Base Faturamento {b:8.2f} | PxQ {x:8.2f} | Delta {d:6.2f}")
+print(f"saida: {SAIDA}")

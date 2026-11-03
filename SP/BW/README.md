@@ -101,8 +101,8 @@ SP/BW/
 | [`1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md`](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md) | Cada transformação do notebook e dos scripts, e o motivo dela. |
 | `2-Checks/resultados/` | Conferências mensais contra o Mercado Receita e a conferência contra o informe de gestão. |
 | `2-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês. |
-| `2-Checks/receita_faturada_Bl1_vs_Bl2/` | Um arquivo por mês com o layout pela tarifa homologada (bloco 1) e pela tarifa realizada (bloco 2), a diferença por fórmula e a diferença separada em Tarifa Social – DMR, fonte incentivada e 2ª passada (isenção de encargos do APE e SCEE - Baixa Renda só como memória na conciliação), e o consolidado com uma linha por mês (seção 5.4). |
-| `2-Checks/check_subsidios_vs_basefaturamento_<ini>_a_<fim>.xlsx` | Subsídios concedidos, mês a mês, pelo relatório do sistema de faturamento contra o Bl1 × Bl2, por item, tipo de cliente e classe, em MR$ (seção 5.4). |
+| `2-Checks/receita_faturada_Bl1_vs_Bl2/` | Um arquivo por mês com o layout pela tarifa homologada (bloco 1) e pela tarifa realizada (bloco 2), a diferença por fórmula e a diferença separada em Tarifa Social – DMR e fonte incentivada (isenção de encargos do APE, SCEE - Baixa Renda e 2ª passada só como memória na conciliação; a aba `tarifa_realizada` traz a 2ª passada e o total entregue nas colunas finais), e o consolidado com uma linha por mês (seção 5.4). |
+| `2-Checks/check_subsidios_vs_basefaturamento_<ini>_a_<fim>.xlsx` | Subsídios concedidos, mês a mês, pelo relatório do sistema de faturamento (Base Faturamento) contra o Bl1 × Bl2 (PxQ), por tipo de cliente e classe, em MR$: abas Total, Tarifa Social e Fonte incentivada, cada uma com os blocos Base Faturamento, PxQ e Delta, de jan a dez mais YTD (seção 5.4). |
 | `2-Checks/tabelas_readme/` | `tabelas_readme.md` e `tabelas_readme.xlsx`: as tabelas de resultados da seção 5 (5.1, 5.3 e 5.4), geradas por `3-Py/readme/tabelas_readme.ipynb`. No Excel, uma aba por tabela com a explicação e a seção correspondente. Fora do Git. |
 | `2-Checks/consolidado_*.xlsx` | Checks por família e camada e por opção de compra e subgrupo, consolidados mês a mês (seção 5.3). |
 | [`3-Py/1-Entrega/prepara_base_bw.py`](3-Py/1-Entrega/prepara_base_bw.py) | Converte a extração mensal do BW (csv de mais de 200 MB) em parquet limpo em `src/parquet/`, confere o total contra o próprio csv, compacta o csv em `src/csv_original/` e o apaga. Roda antes do notebook. |
@@ -481,8 +481,9 @@ que o MR do reajuste é a referência mais segura. A base econômica está abert
 financeiros estão totalizados.
 
 A comparação cobre só a receita tarifável, aberta por item tarifário. Ficam fora tributos (PIS/COFINS
-e ICMS), bandeiras tarifárias, ultrapassagem de demanda e energia reativa (UD/ER) e os demais
-lançamentos sem tarifa homologada (seção 3.8), que o Mercado Receita não traz.
+e ICMS), bandeiras tarifárias, ultrapassagem de demanda e energia reativa (UD/ER), o encargo da conta
+COVID cobrado à parte dos clientes livres (`ZQC237`) e os demais lançamentos sem tarifa homologada
+(seção 3.8), que o Mercado Receita não traz.
 
 O subsídio que o Mercado Receita calcula à parte é distribuído pelos itens com o mesmo mecanismo
 do próprio MR (abatimento de quantidade). Assim, os dois lados carregam os descontos dentro dos
@@ -550,16 +551,20 @@ de compra e subgrupo, em `2-Checks/consolidado_check_mr_bloco2_2026-01_a_2026-05
 ### 5.4 Tarifa homologada × tarifa realizada: onde estão os descontos
 
 O script `3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py` monta o layout Receita Faturada pela
-tarifa homologada e pelo bloco 2 (tarifa realizada, a entrega) e separa a diferença em Tarifa Social –
-DMR, fonte incentivada e 2ª passada, item a item. A tarifa homologada é o bloco 1 sem as duas parcelas
-que não são reembolsadas pela CDE, que ficam só como memória:
+tarifa homologada e pela tarifa realizada e separa a diferença em Tarifa Social – DMR e fonte
+incentivada, item a item. Três parcelas ficam fora da diferença e aparecem só como memória:
 
-- **Isenção de encargos (APE):** com base no PRORET 5.2 (§81 e §91), o consumo isento de encargos sai do
-  mercado de rateio da cota da CDE e não é reembolsado. Esses encargos simplesmente não são cobrados
-  desse cliente, e o custo fica com os demais consumidores pelo rateio da cota.
-- **SCEE - Baixa Renda:** é a TE do SCEE, homologada no reajuste, aplicada sobre a energia compensada.
+- **Isenção de encargos (APE)**, retirada da tarifa homologada: com base no PRORET 5.2 (§81 e §91), o
+  consumo isento de encargos sai do mercado de rateio da cota da CDE e não é reembolsado. Esses encargos
+  simplesmente não são cobrados desse cliente, e o custo fica com os demais consumidores pelo rateio da cota.
+- **SCEE - Baixa Renda**, retirada da tarifa homologada: é a TE do SCEE, homologada no reajuste, aplicada
+  sobre a energia compensada.
+- **2ª passada**, retirada da tarifa realizada: é o ajuste de fechamento, não desconto. A tarifa realizada
+  é o bloco 2 antes dela; a aba `tarifa_realizada` traz no fim as colunas "2a passada" e "Total entregue",
+  que levam ao layout Receita Faturada entregue.
 
-A DMR faturada do mês vem de `src/dmr_tarifa_social.csv` (informe de gestão). Regras e limites no
+Com isso, a diferença é a mesma do check contra o relatório de subsídios do faturamento. A DMR faturada
+do mês vem de `src/dmr_tarifa_social.csv` (informe de gestão). Regras e limites no
 [procedimento](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md), seção "Check tarifa homologada × tarifa
 realizada".
 
@@ -569,18 +574,18 @@ Diferença tarifa homologada − tarifa realizada (R$ milhões; positivo = desco
 |---|---|---|---|---|---|---|---|---|
 | Tarifa Social – DMR | 37,3 | 34,5 | 33,3 | 32,7 | 32,9 | 31,9 | 37,5 | 42,7 |
 | Fonte incentivada | 63,0 | 63,5 | 64,1 | 66,3 | 63,0 | 62,9 | 63,8 | 72,8 |
+| **Total** | **100,3** | **98,0** | **97,4** | **99,0** | **96,0** | **94,9** | **101,3** | **115,5** |
+| Fora da diferença (memória): |  |  |  |  |  |  |  |  |
+| SCEE - Baixa Renda | 1,5 | 2,6 | 2,7 | 3,4 | 2,7 | 2,8 | 3,1 | 2,8 |
+| Isenção de encargos (APE) | 9,9 | 16,1 | 14,7 | 9,2 | 11,0 | 13,0 | 13,1 | 16,1 |
 | 2ª passada | −0,3 | −0,8 | −1,4 | −1,5 | 0,9 | −1,2 | 2,3 | 2,3 |
 | dela, TUSD Consumo Próprio não faturada | 1,6 | 1,4 | 0,7 | 0,9 | 2,6 | 0,7 | 0,8 | 3,3 |
 | dela, demais grupos | −1,9 | −2,2 | −2,2 | −2,3 | −1,7 | −1,9 | 1,5 | −1,0 |
-| **Total** | **100,0** | **97,3** | **96,0** | **97,5** | **96,9** | **93,7** | **103,6** | **117,8** |
-| Retiradas da tarifa homologada (memória): |  |  |  |  |  |  |  |  |
-| SCEE - Baixa Renda | 1,5 | 2,6 | 2,7 | 3,4 | 2,7 | 2,8 | 3,1 | 2,8 |
-| Isenção de encargos (APE) | 9,9 | 16,1 | 14,7 | 9,2 | 11,0 | 13,0 | 13,1 | 16,1 |
-| **Bloco 1 − tarifa realizada** | **111,4** | **116,0** | **113,3** | **110,1** | **110,6** | **109,5** | **119,8** | **136,7** |
+| **Bloco 1 − entrega** | **111,4** | **116,0** | **113,3** | **110,1** | **110,6** | **109,5** | **119,8** | **136,7** |
 
-A linha "Bloco 1 − tarifa realizada" é a linha (c) da seção 5.1, a menos do resíduo; Tarifa Social –
-DMR mais SCEE - Baixa Renda, isenção de encargos (APE), fonte incentivada e 2ª passada são as linhas (d),
-(e), (f) e (g) com o sinal invertido.
+A linha "Bloco 1 − entrega" é a linha (c) da seção 5.1, a menos do resíduo; Tarifa Social – DMR mais
+SCEE - Baixa Renda, isenção de encargos (APE), fonte incentivada e 2ª passada são as linhas (d), (e),
+(f) e (g) com o sinal invertido.
 
 Leitura:
 

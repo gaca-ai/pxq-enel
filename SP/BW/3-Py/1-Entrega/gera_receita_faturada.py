@@ -20,13 +20,16 @@ Regras (README, secao 5.1):
   parcela TUSD e os sem parcela (inclusive subvencoes) sao repartidos entre D e E na
   proporcao da receita TUSD (ou total) do bloco 2 da mesma opcao x classe e tipo de faturamento
   (sem bloco 2 no tipo, vale a proporcao de todos os tipos juntos).
-- ZQC237 (Encargo da conta COVID) entra em CDE CONTAS, unidade E.
+- ZQC237 (Encargo da conta COVID, cobrado a parte dos clientes livres) e nao tarifavel e vai para Outros,
+  como os demais lancamentos sem tarifa: o Mercado Receita nao tem esse valor (sessions, decisao de 03/11/2026;
+  antes ia para CDE CONTAS).
 - UD/ER (coluna nova, antes de PIS/COFINS): ultrapassagem de demanda e energia reativa
   (ultrapassagem, UFER, UFDR, demanda e energia reativa excedente).
 - Outros (coluna nova, antes de PIS/COFINS): os demais nao tarifaveis (acertos da CCEE,
   energia compensada, atualizacao de montante, ERCAP, desconto ex-funcionario, encargo de
-  conexao, substituicao tributaria - debito e credito se anulam por classe) e o residuo
-  sem item tarifario do bloco 2.
+  conexao, encargo da conta COVID dos livres, substituicao tributaria - debito e credito se
+  anulam por classe) e o residuo sem item tarifario do bloco 2. A aba Conferencia lista o
+  conteudo da coluna Outros, por lancamento.
 - Unidade de UD/ER e Outros pelo proprio lancamento: demanda, potencia, kW, UFDR e conexao
   vao para D; o restante para E.
 - Com isso o layout reproduz a receita total do pxq (BW + SD), a base do informe de gestao.
@@ -67,7 +70,6 @@ DIR_PXQ = BASE / "1-Entrega" / "pxq"
 DIR_SAIDA = BASE / "1-Entrega" / "receita_faturada"
 
 CODIGOS_BANDEIRA = {"ZQDFAM", "ZQDPAM", "ZQDFVM", "ZQDPVM", "ZQODAM", "ZQODVM", "ZQDIAM", "ZQDIVM"}
-CODIGO_COVID = "ZQC237"
 SUBCLASSES_BAIXA_RENDA = ("Baixa Renda", "Desconto Social")
 
 OPCAO = {"Cliente Cativo": "CATIVO", "Cliente Livre": "LIVRE", "Cliente Híbrido": "LIVRE",
@@ -83,6 +85,16 @@ COL_UDER, COL_OUTROS = "UD/ER", "Outros"                          # new columns,
 COL_UD_MW = "DEMANDA ULTRAPASSAGEM"                                # new quantity column (MW), after CONSUMO
 PADRAO_UD_MW = "ULTRAPA"                                           # demand overrun lines (non-tariff)
 PADRAO_UDER = "ULTRAPA|UFER|UFDR|REATIV"
+# nature of the entries that go to Outros (Conferencia sheet): (pattern in Grp.estatists.mont., label)
+NATUREZA_OUTROS = [("SUBST", "Substituição tributária dos livres (débito e crédito se anulam)"),
+                   ("COVID", "Encargo da conta COVID dos livres (não tarifável; o Mercado Receita não tem)"),
+                   ("RES. CAP", "ERCAP – reserva de capacidade dos livres"),
+                   ("CCEE", "Acertos homologados pela CCEE"),
+                   ("ATUALIZA", "Atualização de montante"),
+                   ("EX-FUNCION", "Desconto ex-funcionário"),
+                   ("CONEX", "Encargo de conexão"),
+                   ("COMPENSADA", "Energia compensada (SCEE) sem tarifa"),
+                   ("DISPONIBILIDADE", "Custo de disponibilidade (REN 482/2012)")]
 PADRAO_UNID_D = "DEMANDA|POTÊNCIA|POTENCIA|\\(KW\\)|UFDR|CONEX"
 
 
@@ -203,12 +215,11 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     tributo = nt["Operação principal"].astype(str).str.contains("R/#", regex=False)
     nt["COLUNA"] = None
     nt.loc[quant.isin(CODIGOS_BANDEIRA), "COLUNA"] = cab["BANDEIRA"]
-    nt.loc[quant == CODIGO_COVID, "COLUNA"] = cab["CDE CONTAS"]
     nt.loc[tributo & mont.str.contains("ICMS"), "COLUNA"] = cab["ICMS"]
     nt.loc[tributo & mont.str.contains("PIS|COFINS"), "COLUNA"] = cab["PIS/COFINS"]
     nt["PARCELA"] = np.where(mont.str.endswith("- TE"), "TE",
                              np.where(mont.str.endswith("- TUSD"), "TUSD", "GERAL"))
-    nt.loc[nt["COLUNA"].isin([cab["BANDEIRA"], cab["CDE CONTAS"]]), "PARCELA"] = "TE"
+    nt.loc[nt["COLUNA"].eq(cab["BANDEIRA"]), "PARCELA"] = "TE"
     mont_up = mont.str.upper()
     nt.loc[nt["COLUNA"].isna() & mont_up.str.contains(PADRAO_UDER), "COLUNA"] = COL_UDER
     nt.loc[nt["COLUNA"].isna(), "COLUNA"] = COL_OUTROS
@@ -243,6 +254,16 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     for (tp, o, cl, u), v in residuo.items():
         if abs(v) > 0.005:
             extra[(tp, o, cl, u, COL_OUTROS)] = extra.get((tp, o, cl, u, COL_OUTROS), 0.0) + v
+    # what goes into Outros, by BW entry (Conferencia sheet): non-tariff lines and the residue
+    def natureza(mont):
+        t = norm(mont)
+        return next((rot for pad, rot in NATUREZA_OUTROS if norm(pad) in t), "Outros lançamentos sem tarifa")
+    det_outros = [(natureza(m), m if not str(q).startswith("Z") else f"{q} - {m}", v) for (m, q), v in
+                  nt[usa & nt["COLUNA"].eq(COL_OUTROS)].groupby(["Grp.estatísts.mont.", "Grp.estatísts.quant."])
+                  ["RECEITA DE FORNECIMENTO"].sum().items()]
+    v_res = sum(v for v in residuo.values if abs(v) > 0.005)
+    if abs(v_res) > 0.005:
+        det_outros.append(("Resíduo sem item tarifário do bloco 2", "receita - bloco 2 (TA) das linhas tarifáveis", v_res))
 
     # demand overrun quantity (MW), D row of the option x class: overrun lines of Nao_tarifaveis_linha
     # (one row per BW line, so the class is exact); pxq generated before the "Demanda (kW)" column
@@ -276,6 +297,7 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
             if (tp,) + alvo not in tabela.index:
                 tabela.loc[(tp,) + alvo, :] = 0.0
             tabela.loc[(tp,) + alvo, COL_OUTROS] += valor
+            det_outros.append(("Linha E sem correspondente no modelo", f"{tp} / {' / '.join(k)}", valor))
             notas.append(f"{tp} / {' / '.join(k)} sem linha E no modelo: R$ {valor:,.2f} gravados em "
                          f"Outros da linha D ({r[cab['CONSUMO']]:,.3f} MWh não gravados)")
         else:
@@ -356,6 +378,22 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     ws_c.append(["Categoria fora do layout", "Detalhe", "R$"])
     for r in df_fora.sort_values(["Categoria", "R$"]).itertuples(index=False):
         ws_c.append(list(r))
+    ws_c.append([])
+    # detail of the Outros column: must add up to the column total written in the layout
+    i_out = 6 + valores.index(COL_OUTROS)
+    tot_outros = sum(l[i_out] for l in linhas)
+    df_out = pd.DataFrame(det_outros, columns=["Categoria", "Detalhe", "R$"])
+    df_out = df_out[df_out["R$"].abs() > 0.005]
+    ws_c.append([])
+    ws_c.append(["Conteúdo da coluna Outros (natureza)", "Lançamento do BW (Grp.estatísts.mont.)", "R$"])
+    for r in df_out.assign(_a=df_out["R$"].abs()).sort_values(["Categoria", "_a"], ascending=[True, False]).itertuples(index=False):
+        ws_c.append([r.Categoria, r.Detalhe, r[2]])
+    ws_c.append(["Total da coluna Outros no layout", None, tot_outros])
+    dif_out = tot_outros - df_out["R$"].sum()
+    ws_c.append(["Diferença (deve ser zero)", None, dif_out])
+    if abs(dif_out) > 1.0:
+        print(f"ATENCAO {ref}: detalhe de Outros nao fecha com a coluna em R$ {dif_out:,.2f}")
+    ws_c.append(["Substituição tributária: débito e crédito se anulam dentro de cada classe."])
     ws_c.append([])
     ws_c.append(["Gravado por tipo de faturamento (R$)", None])
     for tp in TIPOS:

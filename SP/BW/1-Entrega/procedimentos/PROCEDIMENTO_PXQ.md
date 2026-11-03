@@ -157,7 +157,7 @@ BW e para que o conversor possa aproveitar o que interessa ao layout final.
 |---|---|---|
 | ICMS, PIS/COFINS (operação principal `R/#`) | Tributo, não tarifa | Colunas de tributos da Receita Faturada |
 | Bandeiras (códigos `ZQDFAM`, `ZQDPAM`, `ZQDFVM`, `ZQDPVM`, `ZQODAM`, `ZQODVM`, `ZQDIAM`, `ZQDIVM`) | Adicional definido mês a mês, fora da tarifa homologada | Coluna Bandeira da Receita Faturada |
-| Encargo da conta COVID (`ZQC237`) | Lançado sem quantidade | Grupo CDE Contas da Receita Faturada |
+| Encargo da conta COVID (`ZQC237`) | Cobrado à parte dos clientes livres, sem quantidade; o Mercado Receita não tem esse valor | Coluna Outros da Receita Faturada |
 | Reativos; ultrapassagem de demanda: cativo (`ZQD021`, `ZQD022`, `ZQD023`) e livre (`ZQD019`, `ZQD020`, `ZQD037`) | Multa sobre a demanda acima da contratada, sem item na tabela homologada | Coluna UD/ER da Receita Faturada |
 | Substituição tributária dos livres | Débito e crédito se anulam no mês | Coluna Outros da Receita Faturada (efeito zero) |
 | "TUSD - Desconto Consumo" (`ZQC036`, `ZQC181`, `ZQC182`) e o estorno "Complemento Res. 166/05" (`ZQC059`, `ZQC183`, `ZQC184`) | Isenção do APE, sem quantidade | Usados no Passo 9 |
@@ -563,8 +563,13 @@ Regulação, que precisa da abertura nas camadas da tarifa e não só na tarifa 
   consumo como vêm do BW (`Consumo TUSD`, `Consumo TE`) e os totais, que confundiam a leitura: no
   cativo o BW lança a energia só na TE. Sem painéis
   congelados (como no pxq).
+- **Encargo da conta COVID dos livres (`ZQC237`):** fica fora dos itens, como os demais não tarifáveis,
+  para o relatório seguir a lógica do Mercado Receita, que não tem esse valor (seção "Conferência anual
+  contra o Mercado Receita"). No layout Receita Faturada ele também fica fora das colunas tarifárias (vai
+  para Outros), então o total dos itens fecha com as colunas I a Z do layout.
 - **Conferências:** a receita é a mesma da aba `Componentes`, e BE + CVA + FIN reproduz a TA do bloco 2
-  em cada linha. Uma linha aberta só na TA, sem camadas, fica com os itens zerados e o notebook avisa
+  em cada linha. O relatório tem uma aba só, sem aba de conciliação; as conferências são impressas pelo
+  notebook. Uma linha aberta só na TA, sem camadas, fica com os itens zerados e o notebook avisa
   o valor; com a TE de suprimento na tabela (Passo 4), não há nenhuma em 2026.
 
 ---
@@ -600,12 +605,14 @@ tarifa realizada use exatamente a mesma regra com o bloco 1.
   - A parcela TUSD e os tributos sem parcela, inclusive subvenções, são repartidos entre demanda e
     energia na proporção da receita do bloco 2 da mesma opção, classe e tipo de faturamento. Se o
     tipo não tem bloco 2 nessa opção e classe, vale a proporção dos três tipos juntos.
-- **Conta COVID.** Entra em CDE Contas.
+- **Conta COVID dos livres (`ZQC237`).** Vai para Outros, como os demais não tarifáveis: o Mercado Receita
+  não tem esse valor. Até 03/11/2026 entrava em CDE Contas.
 - **UD/ER e Outros.** Duas colunas que não existem no modelo da área, inseridas antes de PIS/COFINS:
   - **UD/ER:** ultrapassagem de demanda e energia reativa (ultrapassagem, UFER, UFDR, demanda e
     energia reativa excedente);
   - **Outros:** os demais lançamentos sem tarifa (acertos da CCEE, energia compensada, atualização
-    de montante, ERCAP, desconto ex-funcionário, encargo de conexão, substituição tributária) e o
+    de montante, ERCAP, desconto ex-funcionário, encargo de conexão, encargo da conta COVID dos
+    livres, substituição tributária) e o
     resíduo sem item tarifário do bloco 2. Na substituição tributária, débito e crédito se anulam
     dentro de cada classe;
   - a unidade segue o próprio lançamento: demanda, potência, kW, UFDR e conexão vão para a linha D;
@@ -626,8 +633,10 @@ tarifa realizada use exatamente a mesma regra com o bloco 1.
   faturamento normal fora do de-para do calendário de leitura, que ficaram com a tarifa do mês
   (Passo 4).
 - **Aba `Conferencia`.** Concilia: receita total do pxq = valor gravado no layout + o que ficou fora.
-  Com as regras acima nada fica fora, e a diferença tem de ser zero. A aba traz também o total
-  gravado por tipo de faturamento. O total gravado é a receita
+  Com as regras acima nada fica fora, e a diferença tem de ser zero. A aba traz também o conteúdo da
+  coluna Outros, lançamento a lançamento, com a natureza de cada um (substituição tributária, encargo da
+  conta COVID dos livres, ERCAP, acertos da CCEE, atualização de montante etc.), o resíduo sem item
+  tarifário e o total, que tem de bater com a coluna; e o total gravado por tipo de faturamento. O total gravado é a receita
   bruta do BW mais o SD, a mesma base da aba 3.2 do informe de gestão. A diferença para o informe
   vem só do SD (PIS/COFINS das geradoras e receita que falte na planilha do SD).
 
@@ -645,6 +654,13 @@ Uma vez por ano, quando sai o Mercado Receita do reajuste (README 5.2), os scrip
   TUSD do cativo é igual à TE.
 
 A cobrança direta de ERCAP aos livres fica fora dos dois lados.
+
+O encargo da conta COVID cobrado à parte dos clientes livres (`ZQC237`) também fica fora dos dois lados.
+O cativo paga a Conta-COVID dentro da tarifa, no item TE_CDE_COVID, que é comparado normalmente. O livre
+não paga TE, e a parte dele vem numa linha própria, só com valor, sem tarifa homologada × quantidade. O
+Mercado Receita não tem esse valor: nos livres, só traz a CDE COVID da TUSD (`covidTusdEco`), que é
+tarifa; a TE COVID dos livres é zero. Por isso o `ZQC237` é não tarifável no P × Q, como bandeiras, UD/ER
+e tributos, e não entra em nenhum item (decisão de 03/11/2026 no sessions).
 
 ## Check do layout Receita Faturada contra o Mercado Receita
 
@@ -741,7 +757,8 @@ projetado e sem valor de conferência.
 17. `icms` vai para ICMS; `cofins` + `pispasep` vão para PIS/COFINS. A repartição entre D e E segue a
     proporção do valor da opção × classe, como no PxQ.
 18. Bandeira e UD/ER ficam zerados no MR, porque ele não tem esses valores. Na comparação do total,
-    essas colunas (e Outros) aparecem inteiras como diferença.
+    essas colunas (e Outros) aparecem inteiras como diferença. O encargo da conta COVID dos livres
+    (`ZQC237`, de 2,4 a 2,8 MR$ por mês) está em Outros no layout do PxQ e entra nessa diferença.
 19. A geração na linha E, que não existe no modelo, vai para Outros da linha GERAÇÃO / D, como no
     PxQ. O MWh não é gravado.
 
@@ -756,17 +773,21 @@ projetado e sem valor de conferência.
 ## Check tarifa homologada × tarifa realizada (descontos tarifários)
 
 O script `3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py` monta o layout Receita Faturada duas
-vezes, pela tarifa homologada e pelo bloco 2 (tarifa realizada, a entrega), e separa a diferença por
-origem. O objetivo é identificar os itens tarifários que recebem descontos reembolsados pela CDE
+vezes, pela tarifa homologada e pela tarifa realizada, e separa a diferença por origem. O objetivo é identificar os itens tarifários que recebem descontos reembolsados pela CDE
 (Tarifa Social e fonte incentivada).
 
-A tarifa homologada é o bloco 1 (Passo 8) sem as duas parcelas que não são reembolsadas pela CDE. Elas
-ficam só como memória na aba `conciliacao`:
+A tarifa homologada é o bloco 1 (Passo 8) sem as duas parcelas que não são reembolsadas pela CDE, e a
+tarifa realizada é o bloco 2 antes da 2ª passada. As três parcelas ficam só como memória na aba
+`conciliacao`, e a diferença é a mesma do check contra o relatório de subsídios do faturamento:
 
 - **Isenção de encargos (APE):** com base no PRORET 5.2 (§81 e §91), o consumo isento de encargos sai do
   mercado de rateio da cota da CDE e não é reembolsado. Esses encargos simplesmente não são cobrados
   desse cliente, e o custo fica com os demais consumidores pelo rateio da cota.
 - **SCEE - Baixa Renda:** é a TE do SCEE, homologada no reajuste, aplicada sobre a energia compensada.
+- **2ª passada:** ajuste de fechamento, não é desconto. Fica fora da tarifa realizada; a aba
+  `tarifa_realizada` traz no fim as colunas "2a passada" e "Total entregue" (Total I a Z + 2ª passada),
+  igual às colunas I a Z do layout Receita Faturada entregue e ao total dos itens do `PxQ_regulacao`
+  (BE + CVA + FIN).
 
 ```
 python 3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py 2026-05            # um mês
@@ -781,13 +802,12 @@ de opção × classe × unidade.
 | Aba | Conteúdo |
 |---|---|
 | `tarifa_homologada` | Layout pelo bloco 1 sem a isenção de encargos do APE e sem o SCEE - Baixa Renda, com a observação de que a Tarifa Social está valorizada pela tarifa B1 subclasse Baixa Renda sem a redução e a nota das duas parcelas retiradas |
-| `tarifa_realizada` | Layout pelo bloco 2 (igual à entrega) |
+| `tarifa_realizada` | Layout pelo bloco 2 antes da 2ª passada; colunas finais "2a passada" e "Total entregue" (= colunas I a Z da entrega) |
 | `diferenca` | Fórmulas `tarifa_homologada − tarifa_realizada`, célula a célula; positivo = desconto |
 | `ta_somada` | Tarifa de aplicação somada (colunas I a Z), por opção × classe × unidade: tarifa homologada, tarifa realizada, diferença e a parte de cada origem |
 | `desconto_tarifa_social_dmr` | Tarifa Social – DMR: a DMR faturada do mês, aberta pelos itens na proporção da etapa Tarifa Social |
 | `desconto_fonte_incentivada` | Parte que vem do desconto de fonte incentivada (1ª passada) |
-| `ajuste_2a_passada` | Ajuste de fechamento; não é desconto |
-| `conciliacao` | Tarifa Social – DMR + fonte incentivada + 2ª passada = diferença, conferência com os ajustes que o notebook grava em `Componentes` e, como memória, SCEE - Baixa Renda e isenção de encargos (APE), que fecham com o bloco 1 − tarifa realizada |
+| `conciliacao` | Tarifa Social – DMR + fonte incentivada = diferença, conferência com os ajustes que o notebook grava em `Componentes` e, como memória, SCEE - Baixa Renda, isenção de encargos (APE) e 2ª passada, que fecham com o bloco 1 − entrega |
 
 **Regras**
 
@@ -809,7 +829,7 @@ de opção × classe × unidade.
        §8º). O BW não identifica essa energia; valorizada pela TE comum, ela infla o estimado;
      - mês sem DMR no arquivo: a Tarifa Social fica toda na linha DMR, com o valor estimado, e o
        script avisa.
-   - **2ª passada:** fator único sobre todos os itens da linha, f = bloco 2 ÷ (bloco 2 − ajuste da
+   - **2ª passada (fora da diferença, só memória):** fator único sobre todos os itens da linha, f = bloco 2 ÷ (bloco 2 − ajuste da
      2ª passada). O valor antes da 2ª passada é o bloco 2 ÷ f, item a item e camada a camada.
    - **Fonte incentivada:** diferença entre o bloco 1 e o valor antes da 2ª passada nos itens de
      Fio A e Fio B, os únicos em que a 1ª passada atua.
@@ -855,8 +875,15 @@ python 3-Py/2-Checks/check_subsidios_vs_basefaturamento.py 2026-01 2026-09
 
 Entradas: `src/MM-AAAA_ENEL SP_RECEITA_com BAIXA RENDA E FONTE INCENTIVADA.csv` (relatório do time de
 faturamento, um por mês, fora do Git) e os arquivos mensais de `2-Checks/receita_faturada_Bl1_vs_Bl2/`.
-Saída: `2-Checks/check_subsidios_vs_basefaturamento_<ini>_a_<fim>.xlsx`, em MR$, com as abas `Leia-me`,
-`Comparacao` (relatório, Bl1 × Bl2 e delta por mês, acumulado e delta %) e `Delta_MR$`.
+Saída: `2-Checks/check_subsidios_vs_basefaturamento_<ini>_a_<fim>.xlsx`, em MR$, no formato pedido pela
+área: aba `Leia-me` e abas `Total`, `Tarifa Social` e `Fonte incentivada`. Cada aba tem três blocos, um
+abaixo do outro (Base Faturamento = relatório; PxQ = Bl1 × Bl2; Delta = Base Faturamento − PxQ), com as
+linhas Total, Cativo e Livre e as classes, e colunas de jan a dez mais YTD. A célula B2 é o último mês
+fechado (o último com os dois lados): os meses até B2 recebem a marca YTD e os seguintes YTG, e a coluna
+YTD soma só os meses YTD. Somas, YTD e Delta são fórmulas; B2 pode ser alterado à mão. Só aparecem as
+classes com valor em algum mês, nesta ordem: Residencial, Residencial Baixa Renda (só Cativo), Industrial,
+Comercial, Rural, Poder Público, Iluminação Pública, Serviço Público, Consumo Próprio, Suprimento, Uso
+Distribuição, Uso Geração.
 
 **Regras**
 
@@ -871,7 +898,7 @@ Saída: `2-Checks/check_subsidios_vs_basefaturamento_<ini>_a_<fim>.xlsx`, em MR$
 5. Do Bl1 × Bl2 somam-se as colunas tarifárias (Parcela B a Base CVA) das linhas D e E.
 6. Sem abertura por tipo de faturamento: os dois lados somam FAT, REFAT e TOI do mês contábil. O
    subsídio só é calculado para o TOI da Baixa Renda, nos dois lados.
-7. Mês sem um dos arquivos: o lado ausente fica em branco, com aviso, e o mês sai do acumulado.
+7. Mês sem um dos arquivos: o lado ausente fica em branco, com aviso, e o Delta do mês não é calculado.
 
 **Limites do check**
 
