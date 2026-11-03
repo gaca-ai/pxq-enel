@@ -160,6 +160,10 @@ acrescenta ao valor é tratado no bloco 2 (Passo 9).
 Vale a vigência em vigor no último dia do mês. No mês de reajuste (4 de julho em SP), a tarifa
 proporcional ainda não está implementada: o processo avisa e usa a vigência nova.
 
+A modalidade Convencional do grupo A deixou de ter tarifa de energia (a partir da vigência 2025).
+Linhas do grupo A Convencional sem tarifa na vigência são valorizadas como Verde, com aviso, a mesma
+regra da Geração. O posto fora ponta vale só para as modalidades com posto (Azul, Verde e Branca).
+
 ## Passo 8 — Bloco 1
 
 Quantidade × tarifa homologada, item a item e camada a camada, com energia (E) e demanda (D)

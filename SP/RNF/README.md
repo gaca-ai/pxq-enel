@@ -156,7 +156,8 @@ O notebook percorre as etapas abaixo. O porquê de cada uma está no
 
 ## 5. Resultados obtidos
 
-Agosto e setembro de 2026, rodados em sequência (setembro estorna agosto).
+Agosto e setembro de 2026, rodados em sequência (setembro estorna agosto), e dezembro de 2025, base do
+saldo acumulado no ano (YTD).
 
 ### 5.1 Do valor pela tarifa ao valor registrado
 
@@ -264,11 +265,36 @@ Bloco 2, tarifa de aplicação, líquido de PIS/COFINS, MR$.
 | Não tarifáveis (PIS/COFINS, reativo, bandeira) | −1,53 |
 | **Total** | **−56,12** |
 
-O saldo é −38,75 no cativo e −17,37 no livre. O `Saldo_YTD` (contra dezembro de 2025) será gerado
-quando a RNF de dezembro de 2025 for processada.
+O saldo é −38,75 no cativo e −17,37 no livre.
 
-### 5.5 Validações
+### 5.5 Efeito acumulado no ano: saldo YTD contra dezembro de 2025
 
-Todas as conferências internas passaram nos dois meses: bloco 2 igual ao valor líquido em todas as
+A provisão de dezembro de 2025 é de MR$ 1.734,63 (contabilizado no relatório da RNF do mês:
+MR$ 1.734,36). O saldo YTD é a provisão do mês menos a provisão de dezembro.
+
+| Item | ago | set |
+|---|---:|---:|
+| Provisão do mês | 1.849,56 | 1.793,44 |
+| Provisão de dezembro de 2025 | −1.734,63 | −1.734,63 |
+| **Saldo YTD** | **114,93** | **58,81** |
+| dele, cativo | 64,29 | 25,54 |
+| dele, livre | 50,64 | 33,27 |
+
+| Família | ago | set |
+|---|---:|---:|
+| FIO A | 26,62 | 19,24 |
+| FIO B | −13,04 | −25,82 |
+| ENCARGOS | 77,33 | 58,57 |
+| PERDAS | 5,64 | 2,33 |
+| ENERGIA | 23,56 | 10,59 |
+| OUTROS | −2,05 | −1,45 |
+| Não tarifáveis (PIS/COFINS, reativo, bandeira) | −3,13 | −4,65 |
+
+MR$. Dezembro está na tarifa da vigência 2025 e agosto e setembro na vigência 2026: o saldo YTD por
+família mistura o efeito de volume e o do reajuste tarifário.
+
+### 5.6 Validações
+
+Todas as conferências internas passaram nos três meses: bloco 2 igual ao valor líquido em todas as
 linhas; TA = BE + CVA + FIN; famílias = componentes. O layout `receita_nao_faturada` grava o total da
 RNF sem valor fora do layout, e o estorno de setembro é igual à provisão de agosto com sinal trocado.
