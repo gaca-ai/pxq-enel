@@ -4,7 +4,7 @@ Consolidado anual do layout Receita Faturada por familia, com os meses lado a la
 classe (estrutura da aba Parcela B do arquivo de explicacao ACT).
 
 Uso:
-    python gera_consolidado_familias.py 2026
+    python receita_faturada_consolidado.py 2026
 Le     1-Entrega/receita_faturada/receita_faturada_<ano>-<mm>.xlsx (meses que existirem)
 Grava  1-Entrega/receita_faturada/consolidado_familias_<ano>.xlsx
 

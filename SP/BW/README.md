@@ -70,7 +70,7 @@ SP/BW/
 │   │   ├── extrai_pcat.py            gera a tabela de tarifas a partir dos PCATs
 │   │   ├── gera_calendario_leitura.py  converte o calendário de leitura em tabela
 │   │   ├── gera_receita_faturada.py  converte o pxq no layout Receita Faturada
-│   │   └── gera_consolidado_familias.py  consolidado anual do layout por família, classe e mês
+│   │   └── receita_faturada_consolidado.py  consolidado anual do layout por família, classe e mês
 │   ├── 2-Checks/
 │   │   ├── le_mr.py                  lê o Mercado Receita do mês
 │   │   ├── check_mr_bloco2.py        check por opção de compra e subgrupo
@@ -99,7 +99,7 @@ SP/BW/
 | `1-Entrega/pxq/pxq_<ref>.xlsx` | Resultado mensal. A aba `Leia-me` descreve cada aba e os scripts que a usam. A aba `Componentes` traz a tarifa de aplicação e `Componentes_BE` a base econômica, ambas abertas nos 37 itens. `Familias` agrupa os itens nas sete famílias. `Nao_tarifaveis_linha` traz os lançamentos que não entram no cálculo, um a um. `Lotes_sem_calendario` lista os lotes do BW com faturamento normal que não estão no de-para do calendário de leitura. |
 | `1-Entrega/pxq_regulacao/PxQ_regulacao_<ref>.xlsx` | Para a área de Regulação: as mesmas linhas da aba `Componentes`, numa aba só, com a identificação do BW, as quantidades (`Energia com TUSD`, `Energia com TE` e `Demanda`), a receita e a entrega (bloco 2) item a item na BE, na CVA e na FIN. Sem bloco 1, sem colunas de ajuste e sem painéis congelados. |
 | `1-Entrega/receita_faturada/receita_faturada_<ref>.xlsx` | O pxq convertido no layout Receita Faturada, com a aba `Conferencia`, que concilia o total com a receita do BW, e a aba `Lotes sem calendário`. |
-| `1-Entrega/receita_faturada/consolidado_familias_<ano>.xlsx` | Consolidado anual do layout Receita Faturada (FAT + REFAT, sem CNR): uma aba por família, com os meses lado a lado e as linhas por classe (estrutura da aba Parcela B do arquivo de explicação ACT). Em cada aba: monetário total (MR$), energia (MWh), tarifa média (R$/MWh) e monetário detalhado por coluna do layout. A aba `Total` traz a participação de cada família no monetário; há também as abas `Livre por classe` e `CNR`. Gerado por `3-Py/1-Entrega/gera_consolidado_familias.py 2026`. |
+| `1-Entrega/receita_faturada/consolidado_familias_<ano>.xlsx` | Consolidado anual do layout Receita Faturada (FAT + REFAT, sem CNR): uma aba por família, com os meses lado a lado e as linhas por classe (estrutura da aba Parcela B do arquivo de explicação ACT). Em cada aba: monetário total (MR$), energia (MWh), tarifa média (R$/MWh) e monetário detalhado por coluna do layout. A aba `Total` traz a participação de cada família no monetário; há também as abas `Livre por classe` e `CNR`. Gerado por `3-Py/1-Entrega/receita_faturada_consolidado.py 2026`. |
 | [`1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md`](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md) | Cada transformação do notebook e dos scripts, e o motivo dela. |
 | `2-Checks/resultados/` | Conferências mensais contra o Mercado Receita e a conferência contra o informe de gestão. |
 | `2-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês. |

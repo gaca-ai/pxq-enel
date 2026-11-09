@@ -642,12 +642,12 @@ tarifa realizada use exatamente a mesma regra com o bloco 1.
 
 ## Consolidado anual por família
 
-O script `3-Py/1-Entrega/gera_consolidado_familias.py` lê os layouts Receita Faturada do ano e grava
+O script `3-Py/1-Entrega/receita_faturada_consolidado.py` lê os layouts Receita Faturada do ano e grava
 `1-Entrega/receita_faturada/consolidado_familias_<ano>.xlsx`, com os meses lado a lado e as linhas por
 classe, na estrutura da aba Parcela B do arquivo de explicação ACT.
 
 ```
-python 3-Py/1-Entrega/gera_consolidado_familias.py 2026
+python 3-Py/1-Entrega/receita_faturada_consolidado.py 2026
 ```
 
 **Regras**
