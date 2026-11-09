@@ -640,6 +640,53 @@ tarifa realizada use exatamente a mesma regra com o bloco 1.
   bruta do BW mais o SD, a mesma base da aba 3.2 do informe de gestão. A diferença para o informe
   vem só do SD (PIS/COFINS das geradoras e receita que falte na planilha do SD).
 
+## Consolidado anual por família
+
+O script `3-Py/1-Entrega/gera_consolidado_familias.py` lê os layouts Receita Faturada do ano e grava
+`1-Entrega/receita_faturada/consolidado_familias_<ano>.xlsx`, com os meses lado a lado e as linhas por
+classe, na estrutura da aba Parcela B do arquivo de explicação ACT.
+
+```
+python 3-Py/1-Entrega/gera_consolidado_familias.py 2026
+```
+
+**Regras**
+
+1. As abas `Total`, de cada família e `Livre por classe` usam só FAT e REFAT. O CNR (TOI) fica numa aba
+   própria, `CNR`.
+2. Monetário: soma das linhas D e E de cada coluna do layout (toda a receita), em MR$.
+3. Energia: coluna CONSUMO das linhas E, em MWh. A demanda e a demanda de ultrapassagem ficam de fora.
+   Exceção: a Geração é aberta em Geração – Energia (linhas E) e Geração – Demanda (*) (linhas D). Na
+   energia, a linha Geração – Demanda traz a demanda faturada (MW), só para a tarifa média dessa linha
+   (R$/MW); ela não soma na energia da Geração nem no Total. A tarifa média da Geração e do Total usa todo
+   o monetário da geração (D + E) e só a energia em MWh. A explicação vai numa observação em cada aba.
+4. Tarifa média: monetário ÷ energia de cada linha, em R$/MWh. Não é calculada para Bandeira e Tributos.
+5. Linhas: Total; Mercado Cativo e as classes do cativo (Residencial, Residencial (Baixa renda),
+   Industrial, Comercial, Rural, Poderes Públicos, Iluminação Pública, Serviços Públicos, Próprio; SCEE -
+   GD1/GD2 somados na classe); Mercado Livre (só o total); Mercado de Suprimento; Mercado de Uso
+   Distribuição; Geração, com Geração – Energia e Geração – Demanda (*).
+6. Colunas: jan a dez do ano e YTD. Mês sem layout fica em branco, e o layout da planilha não muda ao
+   longo do ano. Totais, YTD, tarifa média e participações são fórmulas.
+7. Cada aba, nesta ordem: monetário total da família, energia, tarifa média e monetário detalhado
+   (cada coluna ou grupo de colunas do layout que compõe a família).
+
+| Aba | Colunas do layout |
+|---|---|
+| Total | Todas as colunas de valor (FAT + REFAT): monetário total, energia, tarifa média e a participação de cada família no monetário total, por linha (%) |
+| Parcela B, RI, Compra de Energia, Perdas | A própria coluna |
+| Transmissão | Rede Básica, Transporte Itaipu, CUSD, Conexão T |
+| Encargos | CDE (CDE USO + CDE CONTAS + CDE ELET); ESS/ERR/ERCAP; Outros encargos (PROINFA + P&D + TFSEE + ONS) |
+| Financeiros | Base Financeira |
+| CVA | Base CVA |
+| Bandeira | Bandeira (sem tarifa média) |
+| UD-ER e Outros | UD/ER; Outros |
+| Tributos | PIS/COFINS; ICMS (sem tarifa média) |
+| Livre por classe | Mercado Livre aberto por classe (FAT + REFAT): monetário total, energia, tarifa média e o monetário de cada família |
+| CNR | Só o CNR: monetário total, energia, tarifa média e o monetário de cada família, nas linhas da aba Total |
+
+A aba `Conferencia` compara, mês a mês, a soma das famílias com o gravado na aba `Conferencia` de cada
+layout, em FAT + REFAT e em CNR; as diferenças têm de ser zero.
+
 ## Conferência anual contra o Mercado Receita
 
 Uma vez por ano, quando sai o Mercado Receita do reajuste (README 5.2), os scripts de
