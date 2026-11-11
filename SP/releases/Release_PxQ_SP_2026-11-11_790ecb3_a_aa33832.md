@@ -1,0 +1,257 @@
+# Release de mudanças – P × Q Enel SP (BW e RNF)
+
+Guia de implementação para o app de geração dos layouts.
+
+| Item | Conteúdo |
+|---|---|
+| Versão de origem | Tag `BW-VF-diferencas-solucionadas` (commit `790ecb3`, 29/10/2026) |
+| Versão de destino | Commit `aa33832` (11/11/2026), branch `main` |
+| Repositório | `C:\python_projects\claude\p_x_q` – pastas `SP/BW` e `SP/RNF` |
+| Unidades | Layouts em R$ mil; consolidados e checks em MR$; energia em MWh; demanda em MW |
+| Escopo | As seções 2 e 3 são obrigatórias para o app reproduzir as entregas (pxq, PxQ_regulacao, receita_faturada, receita_nao_faturada). As seções 4 e 5 trazem os checks e os relatórios novos. |
+
+---
+
+## 1. Resumo das mudanças
+
+| # | Mudança | Onde | Prioridade para o app |
+|---|---|---|---|
+| 1 | Coluna `Demanda (kW)` na aba `Nao_tarifaveis_linha` do pxq | `Abertura_PxQ.ipynb`, Passo 15 | Obrigatória |
+| 2 | Coluna `DEMANDA ULTRAPASSAGEM` (MW) no layout Receita Faturada | `gera_receita_faturada.py` | Obrigatória |
+| 3 | Coluna `Covid Migrantes` (ZQC237) no layout Receita Faturada; ZQC237 deixa CDE CONTAS | `gera_receita_faturada.py` | Obrigatória |
+| 4 | Aba `Conferencia` do layout: conteúdo da coluna Outros por natureza | `gera_receita_faturada.py` | Obrigatória |
+| 5 | Coluna `Covid Migrantes` no PxQ_regulacao | `Abertura_PxQ.ipynb`, Passo 16 | Obrigatória |
+| 6 | RNF: grupo A Convencional sem tarifa valorizado como Verde; posto fora ponta só em Azul, Verde e Branca | `Abertura_RNF.ipynb`, Passo 7 | Obrigatória |
+| 7 | RNF: coluna `Covid Migrantes` (zerada) no layout receita_nao_faturada | `Abertura_RNF.ipynb`, Passo 14 | Obrigatória |
+| 8 | Conversor: parâmetro `detalhe` em `converte` (sem mudança de saída) | `gera_receita_faturada.py` | Só para o extrator (item 14) |
+| 9 | Check Bl1 × Bl2: tarifa homologada sem APE e SCEE - Baixa Renda; tarifa realizada antes da 2ª passada | `gera_receita_faturada_bl1_vs_bl2.py` | Check |
+| 10 | Check novo: subsídios do faturamento × Bl1 × Bl2 | `check_subsidios_vs_basefaturamento.py` | Check |
+| 11 | Check novo: de-para PxQ_regulacao × Mercado Receita | `gera_de_para_regulacao_MR.py` | Check |
+| 12 | Relatório novo: consolidado anual por família | `receita_faturada_consolidado.py` | Relatório |
+| 13 | Relatório novo: Receitas Consolidadas (template da área) | `receitas_consolidadas.py` | Relatório |
+| 14 | Extrator novo: base longa (csv) para Power Query / BI | `extrator_receitas_consolidadas.py` | Relatório (sob demanda) |
+
+---
+
+## 2. Entregas do BW (obrigatórias)
+
+### 2.1 `Abertura_PxQ.ipynb` – Passo 15: aba `Nao_tarifaveis_linha`
+
+- Nova coluna `Demanda (kW)`, com a demanda (kW) de cada lançamento não tarifável, logo antes de `RECEITA DE FORNECIMENTO`. Rótulo interno: `DEMANDA_KW`.
+- A coluna alimenta a `DEMANDA ULTRAPASSAGEM` do layout (item 2.2). As colunas kW e R$ passam a ser gravadas como número (`formata(..., len(COLS_NT) - 3)`).
+
+```python
+ROTULO = {..., "TIPO_FATURAMENTO": "Tipo de faturamento",
+          "DEMANDA_KW": "Demanda (kW)",       # kW of the line (demand overrun -> layout, in MW)
+          "RECEITA_BRL": "RECEITA DE FORNECIMENTO", ...}
+```
+
+### 2.2 Layout Receita Faturada (`gera_receita_faturada.py`)
+
+Ordem final das colunas (linha 3 do layout; colunas novas marcadas com *):
+
+| Bloco | Colunas |
+|---|---|
+| Identificação | Responsável, Competência, TipoFaturamento, OpcaoCompra, Classe, Unidade |
+| Quantidades | CONSUMO (MWh na linha E, MW na linha D), DEMANDA ULTRAPASSAGEM* (MW, só linha D) |
+| Tarifáveis (Total) | Parcela B, RI, Compra de Energia, Perdas, Rede Básica, Transporte Itaipu, CUSD, Conexão T, CDE USO, CDE CONTAS, CDE ELET, PROINFA, ESS/ERR/ERCAP, ONS, P&D, TFSEE, Base Financeira, Base CVA |
+| Não tarifáveis | Covid Migrantes*, Bandeira, UD/ER, Outros, PIS/COFINS, ICMS |
+| Total | `=SUM(Parcela B : Base CVA)` – não inclui Covid Migrantes nem as colunas seguintes |
+
+#### a) DEMANDA ULTRAPASSAGEM (MW)
+
+- Inserida logo após CONSUMO, com o estilo de CONSUMO e unidade "MW" na linha 2.
+- Valor = soma de `Demanda (kW)` / 1000 dos lançamentos não tarifáveis cujo `Grp.estatísts.mont.` contém "ULTRAPA", por TipoFaturamento × OpcaoCompra × Classe, gravada só na linha D.
+- Cativo (ZQD021, ZQD022, ZQD023) e SD trazem a quantidade; a ultrapassagem do livre (ZQD019, ZQD020, ZQD037) vem do BW só com R$.
+- É quantidade: fica fora do Total e da conciliação de R$. Pxq gerado sem a coluna `Demanda (kW)`: a coluna fica vazia e o script avisa.
+
+#### b) Covid Migrantes (ZQC237)
+
+- Encargo da Conta-COVID cobrado à parte dos consumidores que migraram para o mercado livre. Não tarifável; o Mercado Receita não tem esse valor.
+- Na versão de origem o ZQC237 ia para CDE CONTAS. Agora vai para a coluna própria `Covid Migrantes`, antes de Bandeira (coluna AB do layout), fora do Total.
+- Regra: lançamento não tarifável com `Grp.estatísts.quant.` = ZQC237 → coluna Covid Migrantes, unidade E. Em 2026: 2,40 a 2,79 MR$ por mês (out/26: 2,546 MR$).
+
+```python
+COL_COVID = "Covid Migrantes"      # new column, after Base CVA, before Bandeira
+CODIGO_COVID = "ZQC237"
+valores.insert(valores.index(cab["BANDEIRA"]), COL_COVID)
+nt.loc[quant.eq(CODIGO_COVID), "COLUNA"] = COL_COVID
+novas = nt["COLUNA"].isin([COL_UDER, COL_OUTROS, COL_COVID])   # unit by the entry text (E)
+```
+
+No template, a coluna é inserida antes de Bandeira com o estilo de Bandeira (linhas 2 a 4), e as larguras das colunas seguintes são deslocadas.
+
+#### c) Coluna Outros e aba Conferencia
+
+- Outros reúne os demais não tarifáveis e o resíduo sem item tarifário do bloco 2 (receita − TA do bloco 2 por TipoFaturamento × Opção × Classe × Unidade, quando acima de R$ 0,005).
+- A aba `Conferencia` ganhou a seção "Conteúdo da coluna Outros (natureza)": uma linha por lançamento do BW (`Grp.estatísts.mont.` e código), a natureza, o resíduo, o total da coluna e a diferença, que deve ser zero.
+
+| Padrão em `Grp.estatísts.mont.` | Natureza na Conferencia |
+|---|---|
+| SUBST | Substituição tributária dos livres (débito e crédito se anulam) |
+| RES. CAP | ERCAP – reserva de capacidade dos livres |
+| CCEE | Acertos homologados pela CCEE |
+| ATUALIZA | Atualização de montante |
+| EX-FUNCION | Desconto ex-funcionário |
+| CONEX | Encargo de conexão |
+| COMPENSADA | Energia compensada (SCEE) sem tarifa |
+| DISPONIBILIDADE | Custo de disponibilidade (REN 482/2012) |
+| (nenhum dos acima) | Outros lançamentos sem tarifa |
+| – | Resíduo sem item tarifário do bloco 2 |
+
+#### d) Parâmetro `detalhe` em `converte`
+
+- Assinatura: `converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None, detalhe=None)`.
+- Com um dicionário em `detalhe`, a função devolve as linhas usadas no layout: `tar` (linhas tarifáveis classificadas), `nt` (não tarifáveis), `reparte` (rateio D/E dos não tarifáveis), `cols_comp`, `so_ta`, `tar_ta`, `residuo` e `valores`.
+- O rateio D/E foi extraído para a função interna `reparte(tp, o, cl, parc)`, sem mudar a regra. A saída do layout é idêntica. Só é necessário se o app for gerar a base do item 5.3.
+
+### 2.3 `Abertura_PxQ.ipynb` – Passo 16: PxQ_regulacao
+
+- Nova coluna `Covid Migrantes` no fim do arquivo, depois das colunas BE/CVA/FIN dos itens: receita das linhas com `Grp.estatísts.quant.` = ZQC237; vazia nas demais.
+- Fechamento: itens BE + CVA + FIN = Total (Parcela B a Base CVA) do layout; Covid Migrantes = coluna de mesmo nome do layout. O notebook imprime o total da coluna e o número de linhas.
+
+```python
+COL_COVID_REG, CODIGO_COVID_REG = "Covid Migrantes", "ZQC237"
+_covid = aba_regulacao["Grp.estatísts.quant."].astype(str).eq(CODIGO_COVID_REG)
+aba_regulacao = aba_regulacao.assign(**{COL_COVID_REG: aba_regulacao[ROTULO["RECEITA_BRL"]].where(_covid)})
+```
+
+---
+
+## 3. Entregas do RNF (obrigatórias)
+
+### 3.1 `Abertura_RNF.ipynb` – Passo 7: modalidade Convencional do grupo A
+
+- Posto fora ponta da energia só para as modalidades Azul, Verde e Branca (antes: todo o grupo A e a Branca).
+- Linhas do grupo A na modalidade Convencional sem tarifa de energia na vigência são valorizadas como Verde (posto da energia = Fora ponta; posto da demanda = não se aplica), com aviso do MWh e do valor. É a mesma regra usada para GERAÇÃO na base de ajustes manuais.
+
+```python
+fp_energia = linhas["MODALIDADE"].isin(["Azul", "Verde", "Branca"])
+modais = set(zip(TARIFA["TA"].index.get_level_values("SUBGRUPO"), TARIFA["TA"].index.get_level_values("MODALIDADE")))
+sem_modal = (linhas["SUBGRUPO"].str.startswith("A") & (linhas["MODALIDADE"] == "Convencional")
+             & ~pd.Series([(sg, "Convencional") in modais for sg in linhas["SUBGRUPO"]], index=linhas.index))
+linhas.loc[sem_modal, "MODALIDADE"] = "Verde"
+linhas.loc[sem_modal, "POSTO_E"] = "Fora ponta"
+linhas.loc[sem_modal, "POSTO_D"] = NSA
+```
+
+### 3.2 `Abertura_RNF.ipynb` – Passo 14: layout receita_nao_faturada
+
+- Coluna `Covid Migrantes` antes de Bandeira, como no layout Receita Faturada, com o estilo de Bandeira. Sempre zerada: o encargo é cobrado à parte e não tem provisão.
+- O `Total geral` de cada aba (Parcela B a ICMS) passa a incluir a coluna. O Estorno lê a aba `Layout_base` do mês anterior com `reindex`, então meses gerados antes da mudança continuam compatíveis.
+- Ordem de execução: mês a mês, em ordem cronológica (o Estorno usa `rnf_<mês anterior>.xlsx`).
+
+```python
+COL_COVID = conv.COL_COVID
+VALORES_LAY.insert(VALORES_LAY.index(CAB["BANDEIRA"]), COL_COVID)
+```
+
+---
+
+## 4. Checks (pasta `2-Checks`)
+
+### 4.1 Tarifa homologada × tarifa realizada (`gera_receita_faturada_bl1_vs_bl2.py`)
+
+- Tarifa homologada = bloco 1 − SCEE - Baixa Renda − isenção de encargos do APE, item a item e camada a camada (SD = bloco 1). As duas parcelas não são reembolsadas pela CDE (APE: PRORET 5.2, par. 81 e 91).
+- Tarifa realizada = bloco 2 antes da 2ª passada.
+- Diferença = Tarifa Social – DMR + fonte incentivada (positivo = desconto). SCEE - Baixa Renda, APE e 2ª passada ficam como memória na aba `conciliacao`.
+- Aba `tarifa_realizada` com as colunas finais "2a passada" e "Total entregue" (= Total I a Z + 2ª passada = layout Receita Faturada).
+- Abas por mês: `tarifa_homologada`, `tarifa_realizada`, `diferenca`, `ta_somada`, `desconto_tarifa_social_dmr`, `desconto_fonte_incentivada`, `conciliacao`. Consolidado do período com uma linha por mês.
+- Abas `desconto_ape` e `scee_baixa_renda` retiradas. As colunas novas do layout entram pelo próprio conversor; a ultrapassagem é tratada como quantidade.
+- Entrada: `src/dmr_tarifa_social.csv` (`mês;DMR em R$`). Mês sem DMR: a Tarifa Social fica toda na linha DMR (valor estimado), com aviso.
+
+### 4.2 Subsídios do faturamento × Bl1 × Bl2 (`check_subsidios_vs_basefaturamento.py`, novo)
+
+- Compara o relatório de subsídios do faturamento (ZREDU4 = Tarifa Social; ZTUS98 + ZTUS99 = fonte incentivada, sinal invertido) com as abas `desconto_*` do Bl1 × Bl2, por classe e tipo de cliente (Cativo; Livre com híbrido).
+- Subsídio só calculado para o TOI da Baixa Renda; fonte incentivada não se aplica ao TOI.
+- Saída em MR$, no formato da área: abas Total, Tarifa Social e Fonte incentivada, com os blocos Base Faturamento, PxQ e Delta.
+
+### 4.3 De-para PxQ_regulacao × Mercado Receita (`gera_de_para_regulacao_MR.py`, novo)
+
+- Mapeia cada coluna `BE/CVA/FIN <item>` do PxQ_regulacao (37 itens × 3 camadas) para a coluna do MR, com família, parcela (TUSD/TE), fator de subsídio e grupo de comparação. Covid Migrantes entra como camada "Não tarifável", sem coluna no MR.
+- Saída `2-Checks/de_para_PxQ_regulacao_MR.xlsx` (Leia-me, 1_De_para, 2_Validacao_MR$, 3_Validacao_familia_MR$). Exige PxQ_regulacao com a coluna Covid Migrantes. No console do Windows, rodar com `PYTHONIOENCODING=utf-8`.
+- O dicionário `ITENS` desse script é a fonte do de-para usada pelo extrator (item 5.3).
+
+### 4.4 Layout × Mercado Receita (`gera_receita_faturada_mr.py`)
+
+- Só documentação: Covid Migrantes, Bandeira e UD/ER ficam zerados no lado MR e aparecem como diferença.
+
+---
+
+## 5. Relatórios novos (pasta `1-Entrega`)
+
+### 5.1 Consolidado anual por família (`receita_faturada_consolidado.py`)
+
+- `python receita_faturada_consolidado.py 2026` → `1-Entrega/receita_faturada/consolidado_familias_<ano>.xlsx`.
+- Linhas por classe (estrutura da aba Parcela B do arquivo de explicação ACT), meses jan a dez e YTD. Por família: monetário (MR$), energia (MWh, só linhas E), tarifa média (R$/MWh) e monetário detalhado.
+- Abas: Total (com a participação de cada família), uma por família, Livre por classe, CNR e Conferencia.
+- Famílias: Parcela B; RI; Compra de Energia; Perdas; Transmissão; Encargos (CDE, ESS/ERR/ERCAP, Outros encargos); Financeiros; CVA; Bandeira; UD-ER e Outros (UD/ER, Outros, Covid Migrantes); Tributos.
+- Geração aberta em Energia (linhas E) e Demanda (linhas D): a demanda (MW) entra só na tarifa média da própria linha.
+
+### 5.2 Receitas Consolidadas (`receitas_consolidadas.py`)
+
+- `python receitas_consolidadas.py 2026` → `1-Entrega/receitas_consolidadas/receitas_consolidadas_<ano>.xlsx`, no template da área, em MR$.
+- Fontes: Faturamento = receita_faturada (FAT + REFAT + CNR); Subsídio = Bl1 × Bl2 (abas `desconto_*`); RNF = aba Saldo do receita_nao_faturada (provisão do mês + estorno da anterior). As três precisam existir no mês.
+- Abas: Leia-me; Receita (Por Componente, Demais ingressos e Por Cliente); Receita P&C (uma linha por coluna do layout, subtotais Tarifável e Demais ingressos); RI, Parcela B e demais famílias; uma aba Por Cliente por coluna sem aba de família (Rede Básica a TFSEE, Covid Migrantes, Bandeira, UD-ER, Outros, PIS-COFINS, ICMS); Subsídio; Conferencia.
+- Classes: CATIVO e SCEE no Cativo; SUPRIMENTO, USO D e GERAÇÃO no Cativo (Suprimento, Uso Distribuição, Uso Geração); LIVRE no Livre. Ativos e Passivos Regulatórios = Base Financeira. Fórmulas do template corrigidas (lista na aba Leia-me).
+
+### 5.3 Extrator da base (`extrator_receitas_consolidadas.py`, sob demanda)
+
+- `python extrator_receitas_consolidadas.py 2026` → `receitas_consolidadas_base_<ano>.csv` e `receitas_consolidadas_base_<ano>_conferencia.xlsx`, na mesma pasta.
+- Tabela longa para Power Query / BI. Faturamento na abertura máxima (linha do BW/SD × item × camada BE/CVA/FIN; não tarifáveis por lançamento); Subsídio e RNF no nível do layout. Níveis não disponíveis = "(não aberto)".
+- Usa `converte(..., detalhe=...)` e as camadas CVA/FIN do PxQ_regulacao (mesma ordem de linhas do pxq).
+- CSV com separador `;`, vírgula decimal, UTF-8 com BOM, competência dd/mm/aaaa.
+- Colunas: Competência, Bloco, Origem, Fonte, Opção, Grupo, Classe layout, Classe template, Subclasse, Categoria tarifa, Código lançamento, Lançamento, Unidade, Item, Parcela, Camada, Coluna receita_faturada, Componente template, Família consolidado, Família PxQ, Coluna MR, Natureza, Medida, Unid. medida, Valor.
+
+---
+
+## 6. Ordem de execução mensal
+
+| Passo | Script / notebook | Saída |
+|---|---|---|
+| 1 | `3-Py/1-Entrega/prepara_base_bw.py` (csv do BW → parquet) | `src/parquet` |
+| 2 | `1-Entrega/Abertura_PxQ.ipynb` | `pxq_<ref>.xlsx`, `PxQ_regulacao_<ref>.xlsx` |
+| 3 | `3-Py/1-Entrega/gera_receita_faturada.py <ref>` | `receita_faturada_<ref>.xlsx` |
+| 4 | `SP/RNF/1-Entrega/Abertura_RNF.ipynb` (ordem cronológica) | `rnf_<ref>.xlsx`, `receita_nao_faturada_<ref>.xlsx` |
+| 5 | `3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py <ini> <fim>` | `receita_faturada_Bl1_vs_Bl2_<ref>.xlsx` e consolidado |
+| 6 | `3-Py/1-Entrega/receita_faturada_consolidado.py <ano>` | `consolidado_familias_<ano>.xlsx` |
+| 7 | `3-Py/1-Entrega/receitas_consolidadas.py <ano>` | `receitas_consolidadas_<ano>.xlsx` |
+| 8 (opcional) | `3-Py/1-Entrega/extrator_receitas_consolidadas.py <ano>` | `receitas_consolidadas_base_<ano>.csv` |
+
+---
+
+## 7. Valores de referência para validar a implementação (out/2026)
+
+| Relatório | Valor esperado |
+|---|---|
+| receita_faturada_2026-10 | Gravado 2.644,31 MR$ (FAT 2.602,21; REFAT 16,39; CNR 25,71); diferença de conciliação zero |
+| receita_faturada_2026-10 – Covid Migrantes | 2,546 MR$, só em LIVRE / E |
+| receita_faturada_2026-10 – Outros | 1,218 MR$ (antes da mudança: 3,765 MR$) |
+| receita_faturada_2026-10 – quantidades | CONSUMO E 3.787.243,755 MWh; CONSUMO D 8.439,400 MW; DEMANDA ULTRAPASSAGEM 43,798 MW |
+| PxQ_regulacao_2026-10 – Covid Migrantes | R$ 2.546.298,03 em 10 linhas |
+| Covid Migrantes, jan a set/26 (MR$) | 2,400; 2,502; 2,499; 2,738; 2,617; 2,570; 2,497; 2,714; 2,794 |
+| Bl1 × Bl2 out/26 | Diferença 120,71 MR$ (Tarifa Social – DMR 46,55 estimado; fonte incentivada 74,16) |
+| receita_nao_faturada_2026-10 – Saldo | −32,011 MR$; Covid Migrantes zerada |
+| receitas_consolidadas_2026 (YTD jan a out) | Receita Líquida 19.967,9; Faturamento 18.863,8; Subsídio 1.038,8; RNF 65,3; Demais ingressos 5.565,9 (Covid Migrantes 25,9; Outros 6,0) |
+| receitas_consolidadas_base_2026 (jan a out) | 281.068 linhas; Faturamento 24.468,1; Subsídio 1.038,8; RNF 26,8 MR$; conferência célula a célula zero |
+
+---
+
+## 8. Arquivos alterados
+
+| Arquivo | Tipo |
+|---|---|
+| `SP/BW/1-Entrega/Abertura_PxQ.ipynb` | Alterado (Passos 15 e 16) |
+| `SP/BW/3-Py/1-Entrega/gera_receita_faturada.py` | Alterado |
+| `SP/BW/3-Py/1-Entrega/receita_faturada_consolidado.py` | Novo |
+| `SP/BW/3-Py/1-Entrega/receitas_consolidadas.py` | Novo |
+| `SP/BW/3-Py/1-Entrega/extrator_receitas_consolidadas.py` | Novo |
+| `SP/BW/3-Py/2-Checks/gera_receita_faturada_bl1_vs_bl2.py` | Alterado |
+| `SP/BW/3-Py/2-Checks/check_subsidios_vs_basefaturamento.py` | Novo |
+| `SP/BW/3-Py/2-Checks/gera_de_para_regulacao_MR.py` | Novo |
+| `SP/BW/3-Py/2-Checks/gera_receita_faturada_mr.py` | Documentação |
+| `SP/BW/3-Py/readme/tabelas_readme.ipynb` | Alterado (tabela 5.4) |
+| `SP/RNF/1-Entrega/Abertura_RNF.ipynb` | Alterado (Passos 7 e 14) |
+| README, PROCEDIMENTO_PXQ, PROCEDIMENTO_RNF, sessions (BW e RNF), `.gitignore` | Documentação |
+
+Os detalhes de cada regra estão no `PROCEDIMENTO_PXQ.md` (seções "Conversão para o layout Receita Faturada", "Passo 16", "Consolidado anual por família", "Receitas consolidadas" e "Base das receitas consolidadas (csv)") e no `PROCEDIMENTO_RNF.md` (Passos 7 e 14).
