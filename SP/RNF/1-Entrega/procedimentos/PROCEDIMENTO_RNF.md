@@ -248,6 +248,7 @@ de itens para grupos do Faturamento (`../BW/tbl/modelo/De-Para_Modelo_PyC.xlsx`,
 | `Unidade` | E (MWh) ou D (MW) |
 | Parcela B a TFSEE | bloco 2 na camada BE, pelo de-para do modelo |
 | Base Financeira / Base CVA | totais FIN e CVA do bloco 2 |
+| Covid Migrantes | sem valor (o encargo da Conta-COVID dos migrantes para o livre, `ZQC237`, é cobrado à parte e não tem provisão) |
 | Bandeira | bandeira do ZUBIL e dos ajustes |
 | UD/ER | reativo |
 | PIS/COFINS | tributo de cada linha, repartido entre E e D pela receita de cada unidade |
@@ -286,8 +287,9 @@ mesmo layout e unidade da `receita_faturada` (R$ mil; quantidade em MWh ou MW):
 | `Conferencia` | total gravado + fora do layout = total da RNF |
 
 Sem a saída do mês anterior, as abas `Estorno` e `Saldo` trazem um aviso em vez de dados. As colunas
-UD/ER e Outros, que não existem no modelo da área, são inseridas antes de PIS/COFINS, como no
-Faturamento; elas e a coluna Total recebem o formato das demais colunas de valor.
+UD/ER e Outros, que não existem no modelo da área, são inseridas antes de PIS/COFINS, e a coluna Covid
+Migrantes antes de Bandeira, como no Faturamento; elas e a coluna Total recebem o formato das demais
+colunas de valor.
 
 ---
 

@@ -44,7 +44,7 @@ Regras do lado MR:
   (demanda x tarifa kW contra energia x tarifa MWh); CVA e FIN pela tarifa BE Total TUSD.
 - Tributos: icms em ICMS; cofins + pispasep em PIS/COFINS; repartidos entre D e E na
   proporcao do valor da opcao x classe, como no PxQ.
-- Bandeira e UD/ER: o MR nao tem; ficam zerados.
+- Bandeira, UD/ER e Covid Migrantes: o MR nao tem; ficam zerados.
 - Geracao na linha E (sem linha no modelo): vai para Outros da linha GERACAO / D, como no PxQ.
 - Consumo: MWh na linha E (TE_E no cativo, TUSD_E nas demais opcoes) e MW na D (D / 1000).
 - Valores em R$ mil.

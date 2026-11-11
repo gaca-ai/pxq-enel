@@ -20,14 +20,14 @@ Regras (README, secao 5.1):
   parcela TUSD e os sem parcela (inclusive subvencoes) sao repartidos entre D e E na
   proporcao da receita TUSD (ou total) do bloco 2 da mesma opcao x classe e tipo de faturamento
   (sem bloco 2 no tipo, vale a proporcao de todos os tipos juntos).
-- ZQC237 (Encargo da conta COVID, cobrado a parte dos clientes livres) e nao tarifavel e vai para Outros,
-  como os demais lancamentos sem tarifa: o Mercado Receita nao tem esse valor (sessions, decisao de 03/11/2026;
-  antes ia para CDE CONTAS).
+- Covid Migrantes (coluna nova, depois de Base CVA e antes de Bandeira): ZQC237, encargo da Conta-COVID
+  cobrado a parte dos consumidores que migraram para o mercado livre. Nao tarifavel (fora do Total
+  Parcela B a Base CVA); o Mercado Receita nao tem esse valor. Unidade E.
 - UD/ER (coluna nova, antes de PIS/COFINS): ultrapassagem de demanda e energia reativa
   (ultrapassagem, UFER, UFDR, demanda e energia reativa excedente).
 - Outros (coluna nova, antes de PIS/COFINS): os demais nao tarifaveis (acertos da CCEE,
   energia compensada, atualizacao de montante, ERCAP, desconto ex-funcionario, encargo de
-  conexao, encargo da conta COVID dos livres, substituicao tributaria - debito e credito se
+  conexao, substituicao tributaria - debito e credito se
   anulam por classe) e o residuo sem item tarifario do bloco 2. A aba Conferencia lista o
   conteudo da coluna Outros, por lancamento.
 - Unidade de UD/ER e Outros pelo proprio lancamento: demanda, potencia, kW, UFDR e conexao
@@ -82,12 +82,13 @@ COL_ID = ["Responsável", "Competência", "TipoFaturamento", "OpcaoCompra", "Cla
 TIPOS = ("FAT", "REFAT", "CNR")                                    # billing types, in the model order
 COL_TIPO = "Tipo de faturamento"
 COL_UDER, COL_OUTROS = "UD/ER", "Outros"                          # new columns, before PIS/COFINS
+COL_COVID = "Covid Migrantes"                                     # new column, after Base CVA, before Bandeira
+CODIGO_COVID = "ZQC237"                                            # Conta-COVID charge of migrated free customers
 COL_UD_MW = "DEMANDA ULTRAPASSAGEM"                                # new quantity column (MW), after CONSUMO
 PADRAO_UD_MW = "ULTRAPA"                                           # demand overrun lines (non-tariff)
 PADRAO_UDER = "ULTRAPA|UFER|UFDR|REATIV"
 # nature of the entries that go to Outros (Conferencia sheet): (pattern in Grp.estatists.mont., label)
 NATUREZA_OUTROS = [("SUBST", "Substituição tributária dos livres (débito e crédito se anulam)"),
-                   ("COVID", "Encargo da conta COVID dos livres (não tarifável; o Mercado Receita não tem)"),
                    ("RES. CAP", "ERCAP – reserva de capacidade dos livres"),
                    ("CCEE", "Acertos homologados pela CCEE"),
                    ("ATUALIZA", "Atualização de montante"),
@@ -187,6 +188,7 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     valores = [c for c in cab.values() if c not in COL_ID]
     pos = valores.index(cab["PIS/COFINS"])
     valores[pos:pos] = [COL_UDER, COL_OUTROS]
+    valores.insert(valores.index(cab["BANDEIRA"]), COL_COVID)
     valores.insert(valores.index(cab["CONSUMO"]) + 1, COL_UD_MW)
     qtd = {cab["CONSUMO"], COL_UD_MW}                              # quantity columns (not R$)
     linhas = []
@@ -215,6 +217,7 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     tributo = nt["Operação principal"].astype(str).str.contains("R/#", regex=False)
     nt["COLUNA"] = None
     nt.loc[quant.isin(CODIGOS_BANDEIRA), "COLUNA"] = cab["BANDEIRA"]
+    nt.loc[quant.eq(CODIGO_COVID), "COLUNA"] = COL_COVID
     nt.loc[tributo & mont.str.contains("ICMS"), "COLUNA"] = cab["ICMS"]
     nt.loc[tributo & mont.str.contains("PIS|COFINS"), "COLUNA"] = cab["PIS/COFINS"]
     nt["PARCELA"] = np.where(mont.str.endswith("- TE"), "TE",
@@ -223,7 +226,7 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     mont_up = mont.str.upper()
     nt.loc[nt["COLUNA"].isna() & mont_up.str.contains(PADRAO_UDER), "COLUNA"] = COL_UDER
     nt.loc[nt["COLUNA"].isna(), "COLUNA"] = COL_OUTROS
-    novas = nt["COLUNA"].isin([COL_UDER, COL_OUTROS])
+    novas = nt["COLUNA"].isin([COL_UDER, COL_OUTROS, COL_COVID])
     nt.loc[novas, "PARCELA"] = np.where(mont_up[novas].str.contains(PADRAO_UNID_D), "UNID_D", "UNID_E")
 
     usa = nt["COLUNA"].notna() & nt["OPCAO"].notna() & nt["CLASSE"].notna()
@@ -329,6 +332,19 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
             ws.column_dimensions[openpyxl.utils.get_column_letter(c if c < c_pis else c + 2)].width = w
     ws.column_dimensions[openpyxl.utils.get_column_letter(c_pis)].width = 10
     ws.column_dimensions[openpyxl.utils.get_column_letter(c_pis + 1)].width = 10
+    # Covid Migrantes column right before Bandeira, same style as Bandeira
+    c_band = next(c for c in range(2, ws.max_column + 1) if ws.cell(3, c).value == cab["BANDEIRA"])
+    larguras = {c: ws.column_dimensions[openpyxl.utils.get_column_letter(c)].width
+                for c in range(1, ws.max_column + 1)}
+    ws.insert_cols(c_band, 1)
+    for r in (2, 3, 4):
+        ws.cell(r, c_band)._style = copy.copy(ws.cell(r, c_band + 1)._style)
+    ws.cell(2, c_band).value = ws.cell(2, c_band + 1).value
+    ws.cell(3, c_band).value = COL_COVID
+    for c, w in larguras.items():                                 # shift the column widths
+        if w and c >= c_band:
+            ws.column_dimensions[openpyxl.utils.get_column_letter(c + 1)].width = w
+    ws.column_dimensions[openpyxl.utils.get_column_letter(c_band)].width = 14
     # demand overrun quantity column right after CONSUMO, same style as CONSUMO
     c_cons = next(c for c in range(2, ws.max_column + 1) if ws.cell(3, c).value == cab["CONSUMO"])
     larguras = {c: ws.column_dimensions[openpyxl.utils.get_column_letter(c)].width

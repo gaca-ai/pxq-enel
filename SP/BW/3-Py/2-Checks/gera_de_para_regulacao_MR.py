@@ -81,6 +81,8 @@ NOTAS = {
     "Liminar1": "Sem base economica no MR (so CVA e FinCT da liminar)",
 }
 CAMADAS = [("BE", 2), ("CVA", 3), ("FIN", 4)]
+# non-tariff column of the PxQ_regulacao (ZQC237, Conta-COVID charge of migrated free customers)
+COL_COVID = "Covid Migrantes"
 FAMILIAS = ["FIO A", "FIO B", "ENCARGOS", "PERDAS", "ENERGIA", "RI", "OUTROS"]
 
 
@@ -99,6 +101,12 @@ def monta_de_para():
                                             else "Daj / D ou TUSD_Eaj / TUSD_E") if col_mr else "",
                 "Observação": NOTAS.get(col_mr) or NOTAS.get(item, ""),
             })
+    linhas.append({
+        "Família": "OUTROS", "Parcela": "", "Camada": "Não tarifável", "Item PxQ": COL_COVID,
+        "Coluna PxQ_regulacao": COL_COVID, "Coluna MR": "(sem coluna no MR)", "Fator de subsídio do MR": "",
+        "Observação": "ZQC237, encargo da Conta-COVID cobrado à parte dos consumidores que migraram para o "
+                      "mercado livre; não tarifável, o MR não tem esse valor",
+    })
     usadas = {r["Coluna MR"] for r in linhas}
     for fam, cols in FAMILIA_MR.items():
         for c in cols:
@@ -115,7 +123,7 @@ def monta_de_para():
     dp["Grupo de comparação"] = np.where(dp["Coluna MR"].str.startswith("("),
                                          dp["Coluna PxQ_regulacao"], dp["Coluna MR"])
     ordem_fam = {f: i for i, f in enumerate(FAMILIAS)}
-    ordem_cam = {"BE": 0, "CVA": 1, "FIN": 2}
+    ordem_cam = {"BE": 0, "CVA": 1, "FIN": 2, "Não tarifável": 3}
     dp = dp.sort_values(["Camada", "Família", "Parcela", "Item PxQ"],
                         key=lambda s: s.map(ordem_cam) if s.name == "Camada"
                         else s.map(ordem_fam) if s.name == "Família" else s)
@@ -140,7 +148,7 @@ def mr_por_coluna(ref):
 def pxq_por_coluna(ref):
     """PxQ_regulacao of the month by BE/CVA/FIN column (R$)."""
     df = pd.read_excel(BASE / "1-Entrega" / "pxq_regulacao" / f"PxQ_regulacao_{ref}.xlsx")
-    cols = [c for c in df.columns if str(c).split(" ", 1)[0] in ("BE", "CVA", "FIN")]
+    cols = [c for c in df.columns if str(c).split(" ", 1)[0] in ("BE", "CVA", "FIN") or c == COL_COVID]
     return df[cols].fillna(0.0).sum().to_dict()
 
 

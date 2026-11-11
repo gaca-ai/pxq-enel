@@ -61,7 +61,7 @@ FAMILIAS = [
     ("Financeiros", [("Base Financeira", ["Base Financeira"])], True),
     ("CVA", [("Base CVA", ["Base CVA"])], True),
     ("Bandeira", [("Bandeira", ["Bandeira"])], False),
-    ("UD-ER e Outros", [("UD/ER", ["UD/ER"]), ("Outros", ["Outros"])], True),
+    ("UD-ER e Outros", [("UD/ER", ["UD/ER"]), ("Outros", ["Outros"]), ("Covid Migrantes", ["Covid Migrantes"])], True),
     ("Tributos", [("PIS/COFINS", ["PIS/COFINS"]), ("ICMS", ["ICMS"])], False),
 ]
 TODAS = [c for _, det, _ in FAMILIAS for _, cols in det for c in cols]

@@ -70,7 +70,8 @@ SP/BW/
 │   │   ├── extrai_pcat.py            gera a tabela de tarifas a partir dos PCATs
 │   │   ├── gera_calendario_leitura.py  converte o calendário de leitura em tabela
 │   │   ├── gera_receita_faturada.py  converte o pxq no layout Receita Faturada
-│   │   └── receita_faturada_consolidado.py  consolidado anual do layout por família, classe e mês
+│   │   ├── receita_faturada_consolidado.py  consolidado anual do layout por família, classe e mês
+│   │   └── receitas_consolidadas.py  template Receitas Consolidadas (faturamento + subsídio + RNF)
 │   ├── 2-Checks/
 │   │   ├── le_mr.py                  lê o Mercado Receita do mês
 │   │   ├── check_mr_bloco2.py        check por opção de compra e subgrupo
@@ -100,6 +101,7 @@ SP/BW/
 | `1-Entrega/pxq_regulacao/PxQ_regulacao_<ref>.xlsx` | Para a área de Regulação: as mesmas linhas da aba `Componentes`, numa aba só, com a identificação do BW, as quantidades (`Energia com TUSD`, `Energia com TE` e `Demanda`), a receita e a entrega (bloco 2) item a item na BE, na CVA e na FIN. Sem bloco 1, sem colunas de ajuste e sem painéis congelados. |
 | `1-Entrega/receita_faturada/receita_faturada_<ref>.xlsx` | O pxq convertido no layout Receita Faturada, com a aba `Conferencia`, que concilia o total com a receita do BW, e a aba `Lotes sem calendário`. |
 | `1-Entrega/receita_faturada/consolidado_familias_<ano>.xlsx` | Consolidado anual do layout Receita Faturada (FAT + REFAT, sem CNR): uma aba por família, com os meses lado a lado e as linhas por classe (estrutura da aba Parcela B do arquivo de explicação ACT). Em cada aba: monetário total (MR$), energia (MWh), tarifa média (R$/MWh) e monetário detalhado por coluna do layout. A aba `Total` traz a participação de cada família no monetário; há também as abas `Livre por classe` e `CNR`. Gerado por `3-Py/1-Entrega/receita_faturada_consolidado.py 2026`. |
+| `1-Entrega/receitas_consolidadas/receitas_consolidadas_<ano>.xlsx` | Template Receitas Consolidadas (abas `Receita`, `RI` e `Parcela B`) com os meses lado a lado, em MR$: Receita Líquida = Faturamento (receita_faturada) + Subsídio (Bl1 × Bl2) + RNF (aba Saldo do receita_nao_faturada), por componente e por cliente; Demais ingressos em faturado e não faturado. Abas adicionais por família, `Subsídio` (Tarifa Social – DMR e fonte incentivada) e `Conferencia`. Gerado por `3-Py/1-Entrega/receitas_consolidadas.py 2026`. |
 | [`1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md`](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md) | Cada transformação do notebook e dos scripts, e o motivo dela. |
 | `2-Checks/resultados/` | Conferências mensais contra o Mercado Receita e a conferência contra o informe de gestão. |
 | `2-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês. |
@@ -484,7 +486,7 @@ financeiros estão totalizados.
 
 A comparação cobre só a receita tarifável, aberta por item tarifário. Ficam fora tributos (PIS/COFINS
 e ICMS), bandeiras tarifárias, ultrapassagem de demanda e energia reativa (UD/ER), o encargo da conta
-COVID cobrado à parte dos clientes livres (`ZQC237`) e os demais lançamentos sem tarifa homologada
+COVID cobrado à parte dos consumidores que migraram para o livre (`ZQC237`, coluna Covid Migrantes) e os demais lançamentos sem tarifa homologada
 (seção 3.8), que o Mercado Receita não traz.
 
 O subsídio que o Mercado Receita calcula à parte é distribuído pelos itens com o mesmo mecanismo

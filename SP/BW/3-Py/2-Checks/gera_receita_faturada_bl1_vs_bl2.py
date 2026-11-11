@@ -35,7 +35,7 @@ com uma linha por mes em cada aba.
 Regras:
 - O layout de cada bloco e montado pelo proprio conversor (3-Py/1-Entrega/gera_receita_faturada.py,
   funcao converte), com a mesma grade, de-para e classes da entrega: opcao x classe x unidade,
-  todas as linhas do modelo, inclusive as zeradas. Bandeira, UD/ER, Outros e tributos nao dependem
+  todas as linhas do modelo, inclusive as zeradas. Covid Migrantes, Bandeira, UD/ER, Outros e tributos nao dependem
   do bloco e ficam iguais nos dois lados.
 - Diferenca positiva = desconto (o bloco 1 e maior que o bloco 2).
 - Fora da analise (retiradas da tarifa homologada; valores so na conciliacao, como memoria):

@@ -157,7 +157,7 @@ BW e para que o conversor possa aproveitar o que interessa ao layout final.
 |---|---|---|
 | ICMS, PIS/COFINS (operação principal `R/#`) | Tributo, não tarifa | Colunas de tributos da Receita Faturada |
 | Bandeiras (códigos `ZQDFAM`, `ZQDPAM`, `ZQDFVM`, `ZQDPVM`, `ZQODAM`, `ZQODVM`, `ZQDIAM`, `ZQDIVM`) | Adicional definido mês a mês, fora da tarifa homologada | Coluna Bandeira da Receita Faturada |
-| Encargo da conta COVID (`ZQC237`) | Cobrado à parte dos clientes livres, sem quantidade; o Mercado Receita não tem esse valor | Coluna Outros da Receita Faturada |
+| Encargo da conta COVID (`ZQC237`) | Cobrado à parte dos consumidores que migraram para o mercado livre, sem quantidade; o Mercado Receita não tem esse valor | Coluna Covid Migrantes da Receita Faturada e do PxQ_regulacao |
 | Reativos; ultrapassagem de demanda: cativo (`ZQD021`, `ZQD022`, `ZQD023`) e livre (`ZQD019`, `ZQD020`, `ZQD037`) | Multa sobre a demanda acima da contratada, sem item na tabela homologada | Coluna UD/ER da Receita Faturada |
 | Substituição tributária dos livres | Débito e crédito se anulam no mês | Coluna Outros da Receita Faturada (efeito zero) |
 | "TUSD - Desconto Consumo" (`ZQC036`, `ZQC181`, `ZQC182`) e o estorno "Complemento Res. 166/05" (`ZQC059`, `ZQC183`, `ZQC184`) | Isenção do APE, sem quantidade | Usados no Passo 9 |
@@ -563,10 +563,12 @@ Regulação, que precisa da abertura nas camadas da tarifa e não só na tarifa 
   consumo como vêm do BW (`Consumo TUSD`, `Consumo TE`) e os totais, que confundiam a leitura: no
   cativo o BW lança a energia só na TE. Sem painéis
   congelados (como no pxq).
-- **Encargo da conta COVID dos livres (`ZQC237`):** fica fora dos itens, como os demais não tarifáveis,
-  para o relatório seguir a lógica do Mercado Receita, que não tem esse valor (seção "Conferência anual
-  contra o Mercado Receita"). No layout Receita Faturada ele também fica fora das colunas tarifárias (vai
-  para Outros), então o total dos itens fecha com as colunas I a Z do layout.
+- **Covid Migrantes (`ZQC237`):** o encargo da Conta-COVID cobrado à parte dos consumidores que migraram
+  para o mercado livre fica fora dos itens, como os demais não tarifáveis, para o relatório seguir a lógica
+  do Mercado Receita, que não tem esse valor (seção "Conferência anual contra o Mercado Receita"). Ele vai
+  para a coluna própria `Covid Migrantes`, depois dos itens, com a receita das linhas `ZQC237`; nas demais
+  linhas fica vazia. Os itens fecham com o Total (Parcela B a Base CVA) do layout Receita Faturada, e a
+  coluna Covid Migrantes com a coluna de mesmo nome do layout.
 - **Conferências:** a receita é a mesma da aba `Componentes`, e BE + CVA + FIN reproduz a TA do bloco 2
   em cada linha. O relatório tem uma aba só, sem aba de conciliação; as conferências são impressas pelo
   notebook. Uma linha aberta só na TA, sem camadas, fica com os itens zerados e o notebook avisa
@@ -605,14 +607,14 @@ tarifa realizada use exatamente a mesma regra com o bloco 1.
   - A parcela TUSD e os tributos sem parcela, inclusive subvenções, são repartidos entre demanda e
     energia na proporção da receita do bloco 2 da mesma opção, classe e tipo de faturamento. Se o
     tipo não tem bloco 2 nessa opção e classe, vale a proporção dos três tipos juntos.
-- **Conta COVID dos livres (`ZQC237`).** Vai para Outros, como os demais não tarifáveis: o Mercado Receita
-  não tem esse valor. Até 03/11/2026 entrava em CDE Contas.
+- **Covid Migrantes (`ZQC237`).** Coluna própria, depois de Base CVA e antes de Bandeira: o encargo da
+  Conta-COVID cobrado à parte dos consumidores que migraram para o mercado livre. Não tarifável, fica fora
+  do Total (Parcela B a Base CVA); o Mercado Receita não tem esse valor. Unidade E.
 - **UD/ER e Outros.** Duas colunas que não existem no modelo da área, inseridas antes de PIS/COFINS:
   - **UD/ER:** ultrapassagem de demanda e energia reativa (ultrapassagem, UFER, UFDR, demanda e
     energia reativa excedente);
   - **Outros:** os demais lançamentos sem tarifa (acertos da CCEE, energia compensada, atualização
-    de montante, ERCAP, desconto ex-funcionário, encargo de conexão, encargo da conta COVID dos
-    livres, substituição tributária) e o
+    de montante, ERCAP, desconto ex-funcionário, encargo de conexão, substituição tributária) e o
     resíduo sem item tarifário do bloco 2. Na substituição tributária, débito e crédito se anulam
     dentro de cada classe;
   - a unidade segue o próprio lançamento: demanda, potência, kW, UFDR e conexão vão para a linha D;
@@ -634,8 +636,7 @@ tarifa realizada use exatamente a mesma regra com o bloco 1.
   (Passo 4).
 - **Aba `Conferencia`.** Concilia: receita total do pxq = valor gravado no layout + o que ficou fora.
   Com as regras acima nada fica fora, e a diferença tem de ser zero. A aba traz também o conteúdo da
-  coluna Outros, lançamento a lançamento, com a natureza de cada um (substituição tributária, encargo da
-  conta COVID dos livres, ERCAP, acertos da CCEE, atualização de montante etc.), o resíduo sem item
+  coluna Outros, lançamento a lançamento, com a natureza de cada um (substituição tributária, ERCAP, acertos da CCEE, atualização de montante etc.), o resíduo sem item
   tarifário e o total, que tem de bater com a coluna; e o total gravado por tipo de faturamento. O total gravado é a receita
   bruta do BW mais o SD, a mesma base da aba 3.2 do informe de gestão. A diferença para o informe
   vem só do SD (PIS/COFINS das geradoras e receita que falte na planilha do SD).
@@ -679,13 +680,58 @@ python 3-Py/1-Entrega/receita_faturada_consolidado.py 2026
 | Financeiros | Base Financeira |
 | CVA | Base CVA |
 | Bandeira | Bandeira (sem tarifa média) |
-| UD-ER e Outros | UD/ER; Outros |
+| UD-ER e Outros | UD/ER; Outros; Covid Migrantes |
 | Tributos | PIS/COFINS; ICMS (sem tarifa média) |
 | Livre por classe | Mercado Livre aberto por classe (FAT + REFAT): monetário total, energia, tarifa média e o monetário de cada família |
 | CNR | Só o CNR: monetário total, energia, tarifa média e o monetário de cada família, nas linhas da aba Total |
 
 A aba `Conferencia` compara, mês a mês, a soma das famílias com o gravado na aba `Conferencia` de cada
 layout, em FAT + REFAT e em CNR; as diferenças têm de ser zero.
+
+## Receitas consolidadas
+
+O script `3-Py/1-Entrega/receitas_consolidadas.py` monta o template Receitas Consolidadas (abas
+`Receita`, `RI` e `Parcela B`), com os meses lado a lado, e grava
+`1-Entrega/receitas_consolidadas/receitas_consolidadas_<ano>.xlsx`.
+
+```
+python 3-Py/1-Entrega/receitas_consolidadas.py 2026
+```
+
+**Fontes (por mês)**
+
+| Bloco | Arquivo | Aba |
+|---|---|---|
+| Faturamento | `1-Entrega/receita_faturada/receita_faturada_<ref>.xlsx` (FAT + REFAT + CNR) | Receita Faturada |
+| Subsídio | `2-Checks/receita_faturada_Bl1_vs_Bl2/receita_faturada_Bl1_vs_Bl2_<ref>.xlsx` | desconto_tarifa_social_dmr + desconto_fonte_incentivada |
+| RNF | `RNF/1-Entrega/receita_nao_faturada/receita_nao_faturada_<ref>.xlsx` | Saldo (provisão do mês + estorno da provisão anterior) |
+
+O Bl1 × Bl2 e o RNF do mês têm de ser gerados antes do consolidado.
+
+**Regras**
+
+1. Valores em MR$.
+2. Componentes (colunas do layout): Parcela B; RI; Compra de Energia; Perdas; Transmissão = Rede Básica +
+   Transporte Itaipu + CUSD + Conexão T; Encargos = CDE USO + CDE CONTAS + CDE ELET + PROINFA +
+   ESS/ERR/ERCAP + ONS + P&D + TFSEE; CVA = Base CVA; Ativos e Passivos Regulatórios = Base Financeira.
+3. Receita Líquida = Faturamento + Subsídio + RNF dos componentes. Covid Migrantes, Bandeira, UD/ER, Outros,
+   PIS/COFINS e ICMS ficam em Demais ingressos, abertos em Faturamento e Não Faturado.
+4. Subsídio = Tarifa Social – DMR + fonte incentivada (tarifa homologada − tarifa realizada; positivo =
+   desconto).
+5. Classes: CATIVO e SCEE nas classes do Cativo; SUPRIMENTO, USO D e GERAÇÃO no Cativo, nas linhas
+   Suprimento, Uso Distribuição e Uso Geração; LIVRE nas classes do Livre.
+6. Linha 3: YTD até o último mês com receita_faturada, YTG depois; a coluna YTD soma os meses YTD
+   (SUMIFS). Mês sem fonte fica em branco. Totais e YTD são fórmulas.
+7. Fórmulas do template corrigidas: totais Por Cliente = Cativo + Livre; Cativo e Livre = soma das 12
+   classes; Demais ingressos sem vínculo externo; linhas Covid Migrantes e Outros acrescentadas (lista completa na aba
+   `Leia-me`).
+
+| Aba | Conteúdo |
+|---|---|
+| Receita | Por Componente (Faturamento, Subsídio, RNF), Demais ingressos e Por Cliente |
+| RI, Parcela B, Compra de Energia, Perdas, Transmissão, Encargos, CVA, Ativos e Passivos Regulatórios | Por Cliente, só com a família da aba |
+| Subsídio | Tarifa Social – DMR e Fonte incentivada, por componente e por cliente |
+| Conferencia | Faturamento × aba Conferencia do layout; Subsídio × tarifa homologada − tarifa realizada; RNF Saldo × Provisão + Estorno; Por Componente × Por Cliente. Todas as diferenças têm de ser zero |
 
 ## Conferência anual contra o Mercado Receita
 
@@ -707,7 +753,8 @@ O cativo paga a Conta-COVID dentro da tarifa, no item TE_CDE_COVID, que é compa
 não paga TE, e a parte dele vem numa linha própria, só com valor, sem tarifa homologada × quantidade. O
 Mercado Receita não tem esse valor: nos livres, só traz a CDE COVID da TUSD (`covidTusdEco`), que é
 tarifa; a TE COVID dos livres é zero. Por isso o `ZQC237` é não tarifável no P × Q, como bandeiras, UD/ER
-e tributos, e não entra em nenhum item (decisão de 03/11/2026 no sessions).
+e tributos, e não entra em nenhum item. No layout Receita Faturada e no PxQ_regulacao ele fica na coluna
+Covid Migrantes (decisão de 11/11/2026 no sessions).
 
 ## Check do layout Receita Faturada contra o Mercado Receita
 
@@ -803,9 +850,9 @@ projetado e sem valor de conferência.
 
 17. `icms` vai para ICMS; `cofins` + `pispasep` vão para PIS/COFINS. A repartição entre D e E segue a
     proporção do valor da opção × classe, como no PxQ.
-18. Bandeira e UD/ER ficam zerados no MR, porque ele não tem esses valores. Na comparação do total,
-    essas colunas (e Outros) aparecem inteiras como diferença. O encargo da conta COVID dos livres
-    (`ZQC237`, de 2,4 a 2,8 MR$ por mês) está em Outros no layout do PxQ e entra nessa diferença.
+18. Covid Migrantes, Bandeira e UD/ER ficam zerados no MR, porque ele não tem esses valores. Na
+    comparação do total, essas colunas (e Outros) aparecem inteiras como diferença. Covid Migrantes
+    (`ZQC237`) fica entre 2,4 e 2,8 MR$ por mês.
 19. A geração na linha E, que não existe no modelo, vai para Outros da linha GERAÇÃO / D, como no
     PxQ. O MWh não é gravado.
 
