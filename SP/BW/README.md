@@ -71,7 +71,8 @@ SP/BW/
 │   │   ├── gera_calendario_leitura.py  converte o calendário de leitura em tabela
 │   │   ├── gera_receita_faturada.py  converte o pxq no layout Receita Faturada
 │   │   ├── receita_faturada_consolidado.py  consolidado anual do layout por família, classe e mês
-│   │   └── receitas_consolidadas.py  template Receitas Consolidadas (faturamento + subsídio + RNF)
+│   │   ├── receitas_consolidadas.py  template Receitas Consolidadas (faturamento + subsídio + RNF)
+│   │   └── extrator_receitas_consolidadas.py  base longa (csv) das receitas consolidadas, para Power Query / BI
 │   ├── 2-Checks/
 │   │   ├── le_mr.py                  lê o Mercado Receita do mês
 │   │   ├── check_mr_bloco2.py        check por opção de compra e subgrupo
@@ -102,6 +103,7 @@ SP/BW/
 | `1-Entrega/receita_faturada/receita_faturada_<ref>.xlsx` | O pxq convertido no layout Receita Faturada, com a aba `Conferencia`, que concilia o total com a receita do BW, e a aba `Lotes sem calendário`. |
 | `1-Entrega/receita_faturada/consolidado_familias_<ano>.xlsx` | Consolidado anual do layout Receita Faturada (FAT + REFAT, sem CNR): uma aba por família, com os meses lado a lado e as linhas por classe (estrutura da aba Parcela B do arquivo de explicação ACT). Em cada aba: monetário total (MR$), energia (MWh), tarifa média (R$/MWh) e monetário detalhado por coluna do layout. A aba `Total` traz a participação de cada família no monetário; há também as abas `Livre por classe` e `CNR`. Gerado por `3-Py/1-Entrega/receita_faturada_consolidado.py 2026`. |
 | `1-Entrega/receitas_consolidadas/receitas_consolidadas_<ano>.xlsx` | Template Receitas Consolidadas (abas `Receita`, `RI` e `Parcela B`) com os meses lado a lado, em MR$: Receita Líquida = Faturamento (receita_faturada) + Subsídio (Bl1 × Bl2) + RNF (aba Saldo do receita_nao_faturada), por componente e por cliente; Demais ingressos em faturado e não faturado. Abas adicionais por família, `Subsídio` (Tarifa Social – DMR e fonte incentivada) e `Conferencia`. Gerado por `3-Py/1-Entrega/receitas_consolidadas.py 2026`. |
+| `1-Entrega/receitas_consolidadas/receitas_consolidadas_base_<ano>.csv` | Base longa (camada Gold) para Power Query / BI: Faturamento na abertura máxima (linha do BW/SD × item tarifário × camada BE/CVA/FIN e não tarifáveis por lançamento) e Subsídio e RNF no nível do layout, com as colunas de agregação (coluna da receita_faturada, componente do template, família, natureza, família PxQ, coluna do Mercado Receita). Valores em MR$, energia em MWh, demanda em MW. Gerada sob demanda por `3-Py/1-Entrega/extrator_receitas_consolidadas.py 2026`, com a conferência em `receitas_consolidadas_base_<ano>_conferencia.xlsx`. |
 | [`1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md`](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md) | Cada transformação do notebook e dos scripts, e o motivo dela. |
 | `2-Checks/resultados/` | Conferências mensais contra o Mercado Receita e a conferência contra o informe de gestão. |
 | `2-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês. |

@@ -139,10 +139,13 @@ def classe_modelo(classe_principal, subclasse, categoria=None):
     return CLASSE.get(classe_principal)
 
 
-def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None):
+def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None, detalhe=None):
     """Layout of month `ref` from the pxq, using the component columns of `bloco` ("[2]" = the
     delivery). `prepara(comp, be)` may add in-memory blocks; with grava=False nothing is written and
-    the layout table (R$, indexed by option x class x unit, billing types summed) is returned."""
+    the layout table (R$, indexed by option x class x unit, billing types summed) is returned.
+    `detalhe` (a dict) receives the row-level inputs of the layout, with the same classification and
+    split rules (used by extrator_receitas_consolidadas.py): tariff rows, non-tariff rows and the
+    D/E split function of the non-tariff values."""
     arq = DIR_PXQ / f"pxq_{ref}.xlsx"
     comp = pd.read_excel(arq, "Componentes")
     be = pd.read_excel(arq, "Componentes_BE")
@@ -237,21 +240,24 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
         fora.append(("Tipo de faturamento sem grade no modelo", tp, r["RECEITA DE FORNECIMENTO"].sum()))
     usa &= nt["TIPO"].isin(TIPOS)
 
+    def reparte(tp, o, cl, parc):
+        """D/E shares of a non-tariff value of type tp, option o, class cl and parcel parc."""
+        if parc == "TE" or parc == "UNID_E":
+            return {"E": 1.0}
+        if parc == "UNID_D":
+            return {"D": 1.0}
+        peso = "PESO_TUSD" if parc == "TUSD" else "PESO_TOTAL"
+        w = {u: agg.loc[(tp, o, cl, u), peso] if (tp, o, cl, u) in agg.index else 0.0 for u in ("D", "E")}
+        if not w["D"] + w["E"]:                                     # no tariff block in this type
+            w = {u: peso_todos.loc[(o, cl, u), peso] if (o, cl, u) in peso_todos.index else 0.0
+                 for u in ("D", "E")}
+        tot = w["D"] + w["E"]
+        return {u: w[u] / tot for u in w} if tot else {"E": 1.0}
+
     extra = {}
     for (tp, o, cl, col, parc), v in (nt[usa].groupby(["TIPO", "OPCAO", "CLASSE", "COLUNA", "PARCELA"])
                                       ["RECEITA DE FORNECIMENTO"].sum().items()):
-        if parc == "TE" or parc == "UNID_E":
-            partes = {"E": 1.0}
-        elif parc == "UNID_D":
-            partes = {"D": 1.0}
-        else:
-            peso = "PESO_TUSD" if parc == "TUSD" else "PESO_TOTAL"
-            w = {u: agg.loc[(tp, o, cl, u), peso] if (tp, o, cl, u) in agg.index else 0.0 for u in ("D", "E")}
-            if not w["D"] + w["E"]:                                 # no tariff block in this type
-                w = {u: peso_todos.loc[(o, cl, u), peso] if (o, cl, u) in peso_todos.index else 0.0
-                     for u in ("D", "E")}
-            tot = w["D"] + w["E"]
-            partes = {u: w[u] / tot for u in w} if tot else {"E": 1.0}
+        partes = reparte(tp, o, cl, parc)
         for u, p in partes.items():
             extra[(tp, o, cl, u, col)] = extra.get((tp, o, cl, u, col), 0.0) + v * p
     for (tp, o, cl, u), v in residuo.items():
@@ -279,6 +285,10 @@ def converte(ref, wb, cab, de_para, grade, bloco="[2]", grava=True, prepara=None
     else:
         print(f"ATENCAO {ref}: pxq sem a coluna 'Demanda (kW)' em Nao_tarifaveis_linha; "
               f"{COL_UD_MW} fica vazia (rodar o notebook de novo)")
+
+    if detalhe is not None:
+        detalhe.update(tar=t, nt=nt[usa].copy(), reparte=reparte, cols_comp=cols_comp, so_ta=so_ta,
+                       tar_ta=tar_ta.loc[t.index], residuo=residuo, valores=valores)
 
     # ------------------------------------------------ assemble rows on the model grid
     extra_df = (pd.Series(extra, dtype=float).rename_axis(chave + ["COLUNA"])

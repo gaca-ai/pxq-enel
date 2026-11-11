@@ -20,8 +20,12 @@ Abas:
   UD/ER, Outros, PIS/COFINS e ICMS, faturado e nao faturado) e Por Cliente (Cativo e Livre por classe).
 - RI, Parcela B, Compra de Energia, Perdas, Transmissao, Encargos, CVA e Ativos e Passivos
   Regulatorios: Por Cliente so com a familia da aba.
+- Receita P&C: uma linha por coluna do layout Receita Faturada (Parcela B a ICMS), com os subtotais
+  Tarifavel e Demais ingressos; blocos Receita = Faturamento + Subsidio + RNF.
+- Uma aba por coluna do layout sem aba de familia (Rede Basica a TFSEE e Demais ingressos), Por Cliente.
 - Subsidio: Tarifa Social - DMR e Fonte incentivada, por componente e por cliente.
-- Conferencia: cada bloco contra a sua fonte e Por Componente contra Por Cliente.
+- Conferencia: cada bloco contra a sua fonte, Por Componente contra Por Cliente e P&C contra
+  Por Componente + Demais ingressos.
 
 Regras:
 - Valores em MR$ (milhoes de reais). Fontes em R$ mil.
@@ -311,6 +315,7 @@ for i, (rot, _) in enumerate(DEMAIS):
     linha(ws, r_dr + 1 + i, rot, 2, soma([r_df + 1 + i, r_dn + 1 + i]))
 linha(ws, r_di, "Demais ingressos", 0, soma([r_dr]))
 CONF["demais_fat"], CONF["demais_rnf"] = r_df, r_dn
+CONF["demais_total"] = r_dr
 
 pos_rec, blocos, r = secao_cliente(ws, r + 1, "Receita Líquida | Por Cliente", COLS_COMP)
 CONF["cli_total"] = pos_rec["TOTAL"]
@@ -335,6 +340,52 @@ for i, (rot, _) in enumerate(COMPONENTES):
     linha(ws_s, r_rec + 1 + i, rot, 2, soma([orig_rows[t] + 1 + i for t, _ in ORIGENS]))
 linha(ws_s, 6, "Subsídio | Por Componente", 0, soma([r_rec]))
 secao_cliente(ws_s, r + 1, "Subsídio | Por Cliente", COLS_COMP, fontes=ORIGENS, rotulo="Subsídio")
+
+# ------------------------------------------------ Receita P&C: one row per layout column
+# tariff columns in the order of the Receita Faturada layout (Base Financeira before Base CVA)
+COLS_PC = [c for c in COLS_COMP if c not in ("Base Financeira", "Base CVA")] + ["Base Financeira", "Base CVA"]
+
+
+def bloco_pc(ws, r, titulo, getter):
+    """Block total + Tarifavel subtotal (Parcela B to Base CVA) + its columns + Demais ingressos subtotal +
+    its columns. getter(col) -> month getter. Returns ({col or subtotal key: row}, next row)."""
+    pos = {"TOTAL": r, "TAR": r + 1}
+    for i, c in enumerate(COLS_PC):
+        pos[c] = r + 2 + i
+    pos["DEM"] = r + 2 + len(COLS_PC)
+    for i, c in enumerate(COLS_DEMAIS):
+        pos[c] = pos["DEM"] + 1 + i
+    linha(ws, r, titulo, 1, soma([pos["TAR"], pos["DEM"]]))
+    linha(ws, pos["TAR"], "Tarifável (Parcela B a Base CVA)", 2, intervalo(pos[COLS_PC[0]], pos[COLS_PC[-1]]))
+    for c in COLS_PC:
+        linha(ws, pos[c], c, 3, getter(c))
+    linha(ws, pos["DEM"], "Demais ingressos", 2, intervalo(pos[COLS_DEMAIS[0]], pos[COLS_DEMAIS[-1]]))
+    for c in COLS_DEMAIS:
+        linha(ws, pos[c], c, 3, getter(c))
+    return pos, pos[COLS_DEMAIS[-1]] + 2
+
+
+ws_p = wb.create_sheet("Receita P&C")
+prepara(ws_p, f"Receitas consolidadas {ANO} – Receita por coluna do layout (P&C)")
+n_pc = 2 + len(COLS_PC) + 1 + len(COLS_DEMAIS)
+r_pc = 8
+r = r_pc + n_pc + 1
+pc = {}
+for tit, fonte in FONTES:
+    pc[tit], r = bloco_pc(ws_p, r, tit, lambda c, f=fonte: valor(f, [c]))
+pos_pc, _ = bloco_pc(ws_p, r_pc, "Receita", lambda c: soma([pc[t][c] for t, _ in FONTES]))
+linha(ws_p, 6, "Receita | Por coluna do layout Receita Faturada", 0, soma([pos_pc["TOTAL"]]))
+CONF["pc_total"] = pos_pc["TOTAL"]
+
+# one sheet per layout column that has no sheet yet, Por Cliente
+ITENS_ABA = ["Rede Básica", "Transporte Itaipu", "CUSD", "Conexão T", "CDE USO", "CDE CONTAS", "CDE ELET",
+             "PROINFA", "ESS/ERR/ERCAP", "ONS", "P&D", "TFSEE"] + COLS_DEMAIS
+ABAS_ITEM = []
+for c in ITENS_ABA:
+    wsi = wb.create_sheet(c.replace("/", "-")[:31])
+    ABAS_ITEM.append(wsi.title)
+    prepara(wsi, f"Receitas consolidadas {ANO} – {c}")
+    secao_cliente(wsi, 6, f"Receita {c} | Por Cliente", [c])
 
 # ------------------------------------------------ Leia-me
 ws_l = wb.create_sheet("Leia-me", 0)
@@ -374,6 +425,10 @@ TEXTO = [
     "Abas adicionais",
     "Compra de Energia, Perdas, Transmissão, Encargos, CVA e Ativos e Passivos Regulatórios: mesmo layout das abas RI e Parcela B.",
     "Subsídio: Tarifa Social – DMR e Fonte incentivada, por componente e por cliente.",
+    "Receita P&C: uma linha por coluna do layout Receita Faturada (Parcela B a ICMS), com os subtotais Tarifável e "
+    "Demais ingressos; blocos Receita = Faturamento + Subsídio + RNF.",
+    "Uma aba por coluna do layout que não tem aba de família (Rede Básica a TFSEE e Demais ingressos), no layout "
+    "Por Cliente; nos nomes das abas, '/' vira '-'.",
     "Conferencia: cada bloco contra a sua fonte e Por Componente contra Por Cliente.",
 ]
 for i, t in enumerate(TEXTO, start=2):
@@ -390,7 +445,8 @@ cab = ["Mês",
        "Subsídio: origens (MR$)", "Subsídio: homologada - realizada (MR$)", "Diferença",
        "Subsídio em Demais ingressos (deve ser zero)",
        "RNF: Saldo (MR$)", "RNF: Provisão + Estorno (MR$)", "Diferença",
-       "Por Componente - Por Cliente (deve ser zero)"]
+       "Por Componente - Por Cliente (deve ser zero)",
+       "P&C - (Por Componente + Demais ingressos) (deve ser zero)"]
 ws_c.append(cab)
 for k, ref in enumerate(MESES):
     lin = [ref]
@@ -421,6 +477,8 @@ for k, ref in enumerate(MESES):
         lin += [None] * 3
     x = L(CMES[k])
     lin.append(f"=Receita!{x}{CONF['comp_total']}-Receita!{x}{CONF['cli_total']}" if ref <= ULTIMO else None)
+    lin.append(f"='Receita P&C'!{x}{CONF['pc_total']}-Receita!{x}{CONF['comp_total']}-Receita!{x}{CONF['demais_total']}"
+               if ref <= ULTIMO else None)
     ws_c.append(lin)
     for i in (3, 6, 10):
         if lin[i] is not None and abs(lin[i]) > 0.001:
@@ -436,6 +494,10 @@ for c in range(2, len(cab) + 1):
     ws_c.column_dimensions[L(c)].width = 18
 ws_c.row_dimensions[1].height = 60
 
+# sheet order: Leia-me, Receita, Receita P&C, RI, Parcela B, other families, item sheets, Subsidio, Conferencia
+ordem = (["Leia-me", "Receita", "Receita P&C"] + [n[:31] for n, _ in [COMPONENTES[1], COMPONENTES[0]] + COMPONENTES[2:]]
+         + ABAS_ITEM + ["Subsídio", "Conferencia"])
+wb._sheets = [wb[n] for n in ordem]
 DIR_SAIDA.mkdir(parents=True, exist_ok=True)
 wb.save(SAIDA)
 falta = {f: [r for r in com_fat if DADOS[f][r] is None] for f in ("SUB", "RNF")}

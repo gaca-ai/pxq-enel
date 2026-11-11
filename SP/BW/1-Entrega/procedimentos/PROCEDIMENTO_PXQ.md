@@ -730,8 +730,52 @@ O Bl1 × Bl2 e o RNF do mês têm de ser gerados antes do consolidado.
 |---|---|
 | Receita | Por Componente (Faturamento, Subsídio, RNF), Demais ingressos e Por Cliente |
 | RI, Parcela B, Compra de Energia, Perdas, Transmissão, Encargos, CVA, Ativos e Passivos Regulatórios | Por Cliente, só com a família da aba |
+| Receita P&C | Uma linha por coluna do layout Receita Faturada (Parcela B a ICMS), com os subtotais Tarifável e Demais ingressos; blocos Receita = Faturamento + Subsídio + RNF |
+| Rede Básica a TFSEE, Covid Migrantes, Bandeira, UD-ER, Outros, PIS-COFINS, ICMS | Por Cliente, uma aba por coluna do layout que não tem aba de família ('/' vira '-' no nome da aba) |
 | Subsídio | Tarifa Social – DMR e Fonte incentivada, por componente e por cliente |
-| Conferencia | Faturamento × aba Conferencia do layout; Subsídio × tarifa homologada − tarifa realizada; RNF Saldo × Provisão + Estorno; Por Componente × Por Cliente. Todas as diferenças têm de ser zero |
+| Conferencia | Faturamento × aba Conferencia do layout; Subsídio × tarifa homologada − tarifa realizada; RNF Saldo × Provisão + Estorno; Por Componente × Por Cliente; Receita P&C × Por Componente + Demais ingressos. Todas as diferenças têm de ser zero |
+
+## Base das receitas consolidadas (csv)
+
+O script `3-Py/1-Entrega/extrator_receitas_consolidadas.py`, rodado só quando necessário, grava
+`1-Entrega/receitas_consolidadas/receitas_consolidadas_base_<ano>.csv`: uma tabela longa com os três
+blocos (Faturamento, Subsídio e RNF), para consolidar em qualquer formato no Power Query ou num BI.
+
+```
+python 3-Py/1-Entrega/extrator_receitas_consolidadas.py 2026
+```
+
+**Regras**
+
+1. Uma só tabela, com as mesmas colunas para os três blocos. Cada linha é preenchida até o nível que a
+   fonte tem; os níveis abaixo ficam `(não aberto)`.
+2. Faturamento, na abertura máxima: linha do BW/SD (código e texto do lançamento, subclasse, categoria
+   tarifária) × item tarifário × camada (BE, CVA, FIN), e os não tarifáveis lançamento a lançamento. A
+   classificação (opção, classe, unidade, tipo de faturamento), o de-para item → coluna do layout, o
+   resíduo e o rateio D/E dos não tarifáveis vêm do próprio conversor (`gera_receita_faturada.converte`,
+   parâmetro `detalhe`). As camadas CVA e FIN de cada item vêm do PxQ_regulacao, nas mesmas linhas.
+3. Subsídio (Tarifa Social – DMR e Fonte incentivada, do Bl1 × Bl2) e RNF (aba Saldo, por tipo de RNF):
+   nível do layout (opção × classe × unidade × coluna).
+4. Camada: a BE de cada item vai para a coluna do layout do item; CVA e FIN vão para Base CVA e Base
+   Financeira. No Subsídio e no RNF, pela coluna: Base Financeira = FIN, Base CVA = CVA, demais tarifáveis
+   = BE, demais ingressos = Não tarifável.
+5. Colunas de agregação: coluna da receita_faturada, componente do template Receitas Consolidadas,
+   família do consolidado por família, natureza (Tarifável ou Demais ingressos), grupo (Cativo ou Livre)
+   e classe do template; no Faturamento, também família PxQ, parcela (TUSD ou TE) e coluna do Mercado
+   Receita, pelo de-para do `gera_de_para_regulacao_MR.py`.
+6. Medidas: Valor (MR$); Energia (MWh) nas linhas E e Demanda (MW) nas linhas D, iguais ao CONSUMO do
+   layout; Demanda de ultrapassagem (MW). Valores zerados não são gravados.
+7. Formato: separador `;`, vírgula decimal, UTF-8, competência em dd/mm/aaaa.
+8. Conferência (`receitas_consolidadas_base_<ano>_conferencia.xlsx`): por mês e bloco, a base somada no
+   nível do layout contra a fonte, célula a célula; as diferenças têm de ser zero.
+
+| Coluna | Faturamento | Subsídio e RNF |
+|---|---|---|
+| Competência, Bloco, Origem, Opção, Grupo, Classe layout, Classe template, Unidade | sim | sim |
+| Coluna receita_faturada, Componente template, Família consolidado, Natureza, Camada | sim | sim |
+| Fonte, Subclasse, Categoria tarifa, Código lançamento, Lançamento | sim | (não aberto) |
+| Item, Parcela, Família PxQ, Coluna MR | sim | (não aberto) |
+| Medida, Unid. medida, Valor | sim | sim |
 
 ## Conferência anual contra o Mercado Receita
 
