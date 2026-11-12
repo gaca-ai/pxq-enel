@@ -184,7 +184,7 @@ traz:
 | Subgrupo | Primeiro termo da categoria tarifária. B4a e B4b viram B4. |
 | Modalidade | Azul ou Verde pela categoria. Branca quando a categoria termina em `_TB` e o código é de posto horário. Convencional no restante. |
 | Classe | Decorre do subgrupo: B1 residencial, B2 rural, B4 iluminação pública. |
-| Subclasse | Só em B1 e B4. Separa Baixa Renda, Desconto Social e residencial comum, e iluminação B4a ou B4b. |
+| Subclasse | Só em B1 e B4. Separa Baixa Renda, Desconto Social e residencial comum, e iluminação B4a ou B4b, esta pela categoria tarifária do lançamento, em todos os códigos (inclusive `ZQC167`/`ZQC168`). |
 | Detalhe e UC | Sempre `Não se aplica` no fornecimento: só existem nas geradoras. |
 | Posto | Prefixo E (consumo) ou D (demanda), mais o posto lido do texto do lançamento: ponta, fora ponta, intermediário ou nenhum. |
 | Unidade | MWh para consumo, kW para demanda. |
@@ -448,6 +448,18 @@ Passo 8 sai do bloco 1, item a item e camada a camada (coluna `Ajuste Tarifa Soc
   processo. A saída mostra, por grupo, quanto veio da 1ª passada e quanto da 2ª.
 - Com `APLICAR_2A_PASSADA` desligado, a sobra não é distribuída e sai linha a linha do BW nas abas
   `Diferencas_linha` e `Diferencas_grupo`, para investigação.
+- **Consumo Próprio** (parâmetro `PROPRIO_FATURA_TUSD`, padrão `False`; regime `proprio`). A Empresa
+  fatura só a TE do seu consumo próprio; a TUSD não é faturada e vira despesa da companhia, mas é
+  informada à ANEEL (SAMP).
+  - `False`: nos grupos de classe principal Consumo Próprio, a 2ª passada age **só nos itens TUSD**, em
+    todas as camadas; a TE fica pela tarifa homologada. Se a diferença for maior que a TUSD do grupo
+    (receita abaixo da TE), a TUSD vai a zero e o restante é rateado nos demais itens, com aviso. O
+    bloco 2 fecha com a receita.
+  - `True` (TUSD faturada): sem 2ª passada nesses grupos. O bloco 2 fica no valor da 1ª passada (a
+    tarifa homologada), e a diferença para a receita é informada no Passo 9 e vai para o resíduo
+    (coluna Outros) do layout Receita Faturada.
+  - Out/26 com `False`: 11 grupos, 2ª passada de −0,874 MR$ só na TUSD; em 4 grupos (A4 Azul) a
+    receita fica abaixo da TE e a TUSD vai a zero.
 
 **Grupos sem cálculo.** Um grupo com receita e bloco 1 igual a zero não tem item para escalar. A
 receita dele fica fora do bloco 2 e é informada como resíduo sem item tarifário, nunca escondida.
@@ -603,10 +615,16 @@ tarifa realizada use exatamente a mesma regra com o bloco 1.
     subclasses listadas no lançamento são de baixa renda ou desconto social.
 - **Bandeira, PIS/COFINS e ICMS.** Saem da aba `Nao_tarifaveis_linha`, com a classe de cada
   lançamento.
-  - A parcela TE vai para a linha de energia.
-  - A parcela TUSD e os tributos sem parcela, inclusive subvenções, são repartidos entre demanda e
-    energia na proporção da receita do bloco 2 da mesma opção, classe e tipo de faturamento. Se o
-    tipo não tem bloco 2 nessa opção e classe, vale a proporção dos três tipos juntos.
+  - Coluna: tributo é o lançamento com operação principal `R/#`; vai para ICMS quando o texto do
+    lançamento (`Grp.estatísts.mont.`) contém ICMS e para PIS/COFINS quando contém PIS ou COFINS. As
+    subvenções entram somadas ao próprio tributo. A regra vale pelo nome da coluna, não pela posição.
+  - A parcela TE (texto terminado em "- TE") e a bandeira vão para a linha de energia (E).
+  - A parcela TUSD (texto terminado em "- TUSD") é repartida entre demanda (D) e energia (E) na
+    proporção da receita TUSD do bloco 2 da mesma opção, classe e tipo de faturamento.
+  - Os tributos sem parcela são repartidos entre D e E na proporção da receita total (TA) do bloco 2
+    da mesma opção, classe e tipo de faturamento.
+  - Se o tipo de faturamento não tem bloco 2 nessa opção e classe, vale a proporção dos três tipos
+    juntos (FAT, REFAT e CNR); sem bloco 2 em nenhum tipo, o valor vai todo para E.
 - **Covid Migrantes (`ZQC237`).** Coluna própria, depois de Base CVA e antes de Bandeira: o encargo da
   Conta-COVID cobrado à parte dos consumidores que migraram para o mercado livre. Não tarifável, fica fora
   do Total (Parcela B a Base CVA); o Mercado Receita não tem esse valor. Unidade E.
