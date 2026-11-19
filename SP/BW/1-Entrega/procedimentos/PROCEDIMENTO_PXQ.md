@@ -795,6 +795,63 @@ python 3-Py/1-Entrega/extrator_receitas_consolidadas.py 2026
 | Item, Parcela, Família PxQ, Coluna MR | sim | (não aberto) |
 | Medida, Unid. medida, Valor | sim | sim |
 
+## Relatório de energia realizada para BIP/FCT: premissas
+
+Subproduto do P × Q no formato da tabela `tabPxQ` usada no orçamento: uma linha por Grandeza, Natureza
+Mercado, Subgrupo, Modalidade, Classe, Subclasse, Detalhe, Posto, Unidade, Agente e mês, com o volume, a
+tarifa média e a receita por família. As premissas abaixo valem para todo o relatório; nenhuma cria regra
+diferente das do P × Q, e as diferenças para os demais relatórios ficam mapeadas na conferência.
+
+**Opções de saída**
+
+1. Agregada: `FATURADA_MWH` e `DEMANDA_KW` somando FAT, REFAT e TOI (CNR).
+2. Aberta: `FAT_MWH`, `REFAT_MWH`, `TOI_MWH` e os pares de demanda.
+
+Mais `RNF_MWH` (e a demanda do RNF, onde o RNF tem), pelo parâmetro `TIPO_RNF` = `"SALDO"` (padrão,
+provisão do mês + estorno da anterior) ou `"PROVISAO"`.
+
+**Premissas de quantidade**
+
+| Tema | Premissa |
+|---|---|
+| Fonte | Bloco 2 (entrega) do P × Q, linha a linha do pxq, e a abertura do RNF. |
+| REFAT e TOI | No mês de faturamento; a referência original só define a tarifa (tarifa proporcional). REFAT pelo líquido (refaturado − estornado). |
+| Demanda | A do BW e do ZUBIL usada no P × Q, em kW. A ultrapassagem fica fora, como no P × Q (coluna própria no layout). REFAT e TOI como no P × Q. |
+| Unidades | Energia em MWh; demanda em kW (padrão do modelo do orçamento). |
+| Consumo Próprio, Geração e Uso da Distribuição | Em `FATURADA_MWH`, com a energia igual à do P × Q. |
+| Faixas sociais | Tarifa Social e Desconto Social nas faixas 01 e 02, pela estimativa do P × Q (Passo 8). Clientes com benefício social na Tarifa Branca ficam na subclasse cuja tarifa explica o faturamento (Residencial). |
+| `<500` | Ceris, pelo agente do SD. |
+| APE e fonte incentivada | Sem abertura: o BW não identifica a instalação nem a energia (só o desconto em R$). Ficam somados no livre; a tarifa média do livre já traz os dois descontos. |
+| Irrigação / aquicultura | Sem abertura: o BW não traz o detalhe. |
+| SCEE | Sem linha própria: energia compensada somada na classe (ver abaixo). |
+
+**SCEE (geração distribuída)**
+
+Sem linha própria. A energia compensada (`ZQC223` a `ZQC226`, `ZQC234` e `ZQC235`) fica somada na classe,
+como no P × Q: a energia de cada classe é a faturada líquida. O BW não identifica a instalação nem a
+modalidade (GD I ou GD II), e a linha só seria útil com essa separação.
+
+**Premissas de tarifa e receita**
+
+- Tarifa média realizada de cada linha = receita ÷ volume, por família: Fio B, RI, Energia, Perdas, Fio
+  A, Encargos e CVA (camada CVA); Financeiros = Total − soma das famílias (camada FIN), como no modelo.
+  Total = tarifa de aplicação do bloco 2.
+- Receita em R$ mil (volume × tarifa ÷ 1.000), padrão do modelo do orçamento.
+- Só a receita tarifável. Bandeira, tributos, UD/ER, Outros e Covid Migrantes ficam fora.
+- A receita total por mês, mercado e classe fecha com o P × Q e com o total tarifável (Parcela B a Base
+  CVA) do layout Receita Faturada; a do RNF, com o receita_nao_faturada.
+
+**Aba Subsídio**
+
+O subsídio estimado no Bl1 × Bl2 (Tarifa Social – DMR e fonte incentivada), nas mesmas chaves do
+relatório (subgrupo, modalidade, classe, subclasse, posto e mês), em R$ mil. O total fecha com o
+consolidado do Bl1 × Bl2.
+
+**Conferência**
+
+Por mês e grandeza: volume e receita do relatório contra o layout Receita Faturada (CONSUMO e total
+tarifável) e o receita_nao_faturada. Volume e receita têm de fechar sem diferença.
+
 ## Conferência anual contra o Mercado Receita
 
 Uma vez por ano, quando sai o Mercado Receita do reajuste (README 5.2), os scripts de
