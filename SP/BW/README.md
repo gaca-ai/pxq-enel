@@ -55,6 +55,7 @@ SP/BW/
 │   ├── pxq/                      saída mensal do notebook: pxq_<aaaa-mm>.xlsx
 │   ├── pxq_regulacao/            a entrega aberta em BE, CVA e FIN, para a Regulação
 │   ├── receita_faturada/         a mesma saída no layout Receita Faturada e o consolidado anual por família
+│   ├── relatorio_energia_bip_fct/  relatório de energia realizada para BIP/FCT (tabela tabPxQ do orçamento)
 │   └── procedimentos/
 │       └── PROCEDIMENTO_PXQ.md   manual gerencial do notebook
 ├── 2-Checks/                     saídas das conferências
@@ -72,7 +73,8 @@ SP/BW/
 │   │   ├── gera_receita_faturada.py  converte o pxq no layout Receita Faturada
 │   │   ├── receita_faturada_consolidado.py  consolidado anual do layout por família, classe e mês
 │   │   ├── receitas_consolidadas.py  template Receitas Consolidadas (faturamento + subsídio + RNF)
-│   │   └── extrator_receitas_consolidadas.py  base longa (csv) das receitas consolidadas, para Power Query / BI
+│   │   ├── extrator_receitas_consolidadas.py  base longa (csv) das receitas consolidadas, para Power Query / BI
+│   │   └── relatorio_energia_bip_fct.py  relatório de energia realizada para BIP/FCT
 │   ├── 2-Checks/
 │   │   ├── le_mr.py                  lê o Mercado Receita do mês
 │   │   ├── check_mr_bloco2.py        check por opção de compra e subgrupo
@@ -104,6 +106,7 @@ SP/BW/
 | `1-Entrega/receita_faturada/consolidado_familias_<ano>.xlsx` | Consolidado anual do layout Receita Faturada (FAT + REFAT, sem CNR): uma aba por família, com os meses lado a lado e as linhas por classe (estrutura da aba Parcela B do arquivo de explicação ACT). Em cada aba: monetário total (MR$), energia (MWh), tarifa média (R$/MWh) e monetário detalhado por coluna do layout. A aba `Total` traz a participação de cada família no monetário; há também as abas `Livre por classe` e `CNR`. Gerado por `3-Py/1-Entrega/receita_faturada_consolidado.py 2026`. |
 | `1-Entrega/receitas_consolidadas/receitas_consolidadas_<ano>.xlsx` | Template Receitas Consolidadas (abas `Receita`, `RI` e `Parcela B`) com os meses lado a lado, em MR$: Receita Líquida = Faturamento (receita_faturada) + Subsídio (Bl1 × Bl2) + RNF (aba Saldo do receita_nao_faturada), por componente e por cliente; Demais ingressos em faturado e não faturado. Abas adicionais por família, `Subsídio` (Tarifa Social – DMR e fonte incentivada) e `Conferencia`. Gerado por `3-Py/1-Entrega/receitas_consolidadas.py 2026`. |
 | `1-Entrega/receitas_consolidadas/receitas_consolidadas_base_<ano>.csv` | Base longa (camada Gold) para Power Query / BI: Faturamento na abertura máxima (linha do BW/SD × item tarifário × camada BE/CVA/FIN e não tarifáveis por lançamento) e Subsídio e RNF no nível do layout, com as colunas de agregação (coluna da receita_faturada, componente do template, família, natureza, família PxQ, coluna do Mercado Receita). Valores em MR$, energia em MWh, demanda em MW. Gerada sob demanda por `3-Py/1-Entrega/extrator_receitas_consolidadas.py 2026`, com a conferência em `receitas_consolidadas_base_<ano>_conferencia.xlsx`. |
+| `1-Entrega/relatorio_energia_bip_fct/relatorio_energia_bip_fct_<ano>_<opção>.xlsx` | Relatório de energia realizada para BIP/FCT, no formato da tabela `tabPxQ` do modelo do orçamento (só valores, sem vínculos): uma linha por Grandeza, Natureza Mercado, Subgrupo, Modalidade, Classe, Subclasse, Detalhe, Posto, Unidade, Agente e mês, com volume (MWh / kW), tarifa média e receita em R$ mil por família. Dois arquivos: `agregado` (`FATURADA_MWH`, `DEMANDA_KW`) e `por_tipo` (`FAT_MWH`, `REFAT_MWH`, `TOI_MWH` e os pares de demanda); nos dois, `RNF_MWH` e `DEMANDA_RNF_KW` pelo `TIPO_RNF` (SALDO padrão ou PROVISAO). Abas PXQ, Subsidio (Tarifa Social – DMR e fonte incentivada do Bl1 × Bl2, nas mesmas chaves), Conferencia (faturamento × Receita Faturada, RNF × receita_nao_faturada e subsídio × Bl1 × Bl2, todos com diferença zero) e Leia-me. Gerado por `3-Py/1-Entrega/relatorio_energia_bip_fct.py 2026` (opcional: meses e `--tipo-rnf=PROVISAO`). Premissas no procedimento. |
 | [`1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md`](1-Entrega/procedimentos/PROCEDIMENTO_PXQ.md) | Cada transformação do notebook e dos scripts, e o motivo dela. |
 | `2-Checks/resultados/` | Conferências mensais contra o Mercado Receita e a conferência contra o informe de gestão. |
 | `2-Checks/receita_faturada_MR/` | Um arquivo por mês com as abas `PxQ`, `MR`, `check` (fórmulas PxQ − MR) e `Conciliacao`, por opção de compra × unidade, e o consolidado com uma linha por mês. |
@@ -138,6 +141,8 @@ estão. Por isso os comandos acima rodam a partir de `SP/BW`.
    inclusive o `gera_receita_faturada_mr.py`, depois do passo 3.
 6. Para atualizar a seção 5 deste documento, rodar `3-Py/readme/tabelas_readme.ipynb` e copiar as
    tabelas de `2-Checks/tabelas_readme/tabelas_readme.md`.
+7. Relatório BIP/FCT: com o RNF do mês (`SP/RNF`, aba `Componentes_unidade`) e o Bl1 × Bl2 gerados, rodar
+   `python 3-Py/1-Entrega/relatorio_energia_bip_fct.py <ano>`.
 
 ### Versões
 

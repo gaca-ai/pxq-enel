@@ -807,8 +807,11 @@ diferente das do P × Q, e as diferenças para os demais relatórios ficam mapea
 1. Agregada: `FATURADA_MWH` e `DEMANDA_KW` somando FAT, REFAT e TOI (CNR).
 2. Aberta: `FAT_MWH`, `REFAT_MWH`, `TOI_MWH` e os pares de demanda.
 
-Mais `RNF_MWH` (e a demanda do RNF, onde o RNF tem), pelo parâmetro `TIPO_RNF` = `"SALDO"` (padrão,
-provisão do mês + estorno da anterior) ou `"PROVISAO"`.
+Nas duas, `RNF_MWH` e `DEMANDA_RNF_KW`, pelo parâmetro `TIPO_RNF` = `"SALDO"` (padrão, provisão do mês −
+provisão do mês anterior, cada uma com seus atributos e tarifas) ou `"PROVISAO"` (`--tipo-rnf=PROVISAO`; o
+arquivo leva o sufixo `_rnf_provisao`). A fonte é a aba `Componentes_unidade` do `rnf_<mês>.xlsx` (bloco 2 do
+RNF por linha, unidade e camada, gravada pelo notebook Abertura_RNF); no SALDO, também a do mês anterior.
+Faixas sociais do RNF pela estimativa do próprio RNF (% energia na faixa 02).
 
 **Premissas de quantidade**
 
@@ -843,9 +846,24 @@ modalidade (GD I ou GD II), e a linha só seria útil com essa separação.
 
 **Aba Subsídio**
 
-O subsídio estimado no Bl1 × Bl2 (Tarifa Social – DMR e fonte incentivada), nas mesmas chaves do
-relatório (subgrupo, modalidade, classe, subclasse, posto e mês), em R$ mil. O total fecha com o
-consolidado do Bl1 × Bl2.
+Desconto reembolsado pela CDE estimado no Bl1 × Bl2 (Tarifa Social – DMR e fonte incentivada; ver "Check
+tarifa homologada × tarifa realizada"), linha a linha do pxq, nas chaves do relatório. Tabela `tabSubsidio`.
+
+- Mesmos blocos do Bl1 × Bl2 (função `prepara` do script): Tarifa Social – DMR = bloco 1 − [D];
+  fonte incentivada = [A] − [P]. Positivo = desconto. Fora: isenção de encargos do APE, SCEE – Baixa
+  Renda, Desconto Social e 2ª passada, que a CDE não reembolsa ou não são desconto.
+- Só faturamento (FAT + REFAT + TOI); no arquivo "por tipo", aberto por tipo. O RNF não tem subsídio
+  calculado.
+- R$ mil por origem e por família, como a receita: Fio B, RI, Energia, Perdas, Fio A e Encargos pela
+  base econômica de cada item; CVA pela camada CVA; Financeiros = Total − famílias.
+- Faixas da Tarifa Social: a faixa 01 é isenta (receita zero no PXQ), então o seu subsídio é todo o valor
+  homologado da faixa (bloco 1 × % energia na faixa 01) × fator DMR; a faixa 02 fica com o restante. O
+  script avisa se a faixa 02 ficar negativa. Desconto Social (se tiver subsídio): pelas tarifas das faixas,
+  como a receita.
+- Volume = todo o volume da chave (não só o dos clientes com desconto); subsídio médio = subsídio ÷
+  volume × 1.000 (R$/MWh ou R$/kW). Só entram as chaves com subsídio.
+- O total por mês e origem fecha com a aba `conciliacao` do Bl1 × Bl2 do mês (coluna Layout), na aba
+  Conferencia do relatório.
 
 **Conferência**
 
@@ -1044,6 +1062,10 @@ de opção × classe × unidade.
        script avisa.
    - **2ª passada (fora da diferença, só memória):** fator único sobre todos os itens da linha, f = bloco 2 ÷ (bloco 2 − ajuste da
      2ª passada). O valor antes da 2ª passada é o bloco 2 ÷ f, item a item e camada a camada.
+     Exceção: Consumo Próprio (regime `proprio`), onde a 2ª passada só age na TUSD (Passo 9) e o fator
+     único levaria parte dela para a fonte incentivada. Essas linhas não têm Tarifa Social, APE nem 1ª
+     passada, então o valor antes da 2ª passada é o próprio bloco 1; o script para com erro se alguma
+     delas tiver uma dessas etapas.
    - **Fonte incentivada:** diferença entre o bloco 1 e o valor antes da 2ª passada nos itens de
      Fio A e Fio B, os únicos em que a 1ª passada atua.
    - **Isenção de encargos (APE, retirada da tarifa homologada):** a mesma diferença nos demais itens

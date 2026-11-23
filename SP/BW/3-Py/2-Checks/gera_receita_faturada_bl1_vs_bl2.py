@@ -52,6 +52,8 @@ Regras:
     (PRORET 5.2, par. 81 e 91).
   * 2a passada: fator unico sobre todos os itens da linha, f = bloco 2 / (bloco 2 - ajuste da
     2a passada). O valor antes da 2a passada e o bloco 2 / f, item a item e camada a camada.
+    Consumo Proprio (regime "proprio"): a 2a passada so age na TUSD, entao o valor antes dela e o
+    bloco 1 depois da Tarifa Social ([T]); essas linhas nao tem Tarifa Social, APE nem 1a passada.
   * Fonte incentivada: diferenca entre o valor depois da Tarifa Social e o valor antes da 2a
     passada nos itens de Fio A e Fio B (a 1a passada so atua nesses itens).
   * APE (fora da analise): a mesma diferenca nos demais itens (a isencao do APE atua nos encargos).
@@ -186,6 +188,21 @@ def prepara(comp, be, fator_dmr=1.0):
             df.loc[sd, [f"[P] {i}", f"[A] {i}"]] = df.loc[sd, [f"[2] {i}"] * 2].values
         for c in CAMADAS_TOT:
             df.loc[sd, [f"[P] Total {c}", f"[A] Total {c}"]] = df.loc[sd, [f"[2] Total {c}"] * 2].values
+    # Consumo Proprio rows (regime "proprio", notebook Passo 9): the 2nd pass acts only on the TUSD items,
+    # so the single factor f2 does not recover the value before it, item by item. These rows have no
+    # Tarifa Social, APE or 1st pass step, so the value before the 2nd pass is [T] (= bloco 1)
+    if "Regime de ajuste" in comp:
+        pr = (comp["Regime de ajuste"] == "proprio").values
+        if pr.any():
+            etapas = sum(num(comp[c]).abs() for c in (COL_AJ_TS, COL_AJ_APE, COL_AJ_1) if c in comp)
+            if (etapas.values[pr] > 0.005).any():
+                raise ValueError("Consumo Proprio (regime proprio) com etapa de Tarifa Social, APE ou 1a passada: "
+                                 "o valor antes da 2a passada nao pode ser reconstruido")
+            for df in (comp, be):
+                for i in itens:
+                    df.loc[pr, [f"[P] {i}", f"[A] {i}"]] = df.loc[pr, [f"[T] {i}"] * 2].values
+                for c in CAMADAS_TOT:
+                    df.loc[pr, [f"[P] Total {c}", f"[A] Total {c}"]] = df.loc[pr, [f"[T] Total {c}"] * 2].values
     # tariff baseline [H] = [1] - ([D] - [T]) - ([T] - [A]) = [1] - [D] + [A]; SD rows keep bloco 1
     nomes = [f"{{}} {i}" for i in itens] + [f"{{}} Total {c}" for c in CAMADAS_TOT]
 

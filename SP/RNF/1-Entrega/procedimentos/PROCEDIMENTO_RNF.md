@@ -264,6 +264,7 @@ de itens para grupos do Faturamento (`../BW/tbl/modelo/De-Para_Modelo_PyC.xlsx`,
 | `Componentes` | bloco 1 e bloco 2 por linha, 37 itens, tarifa de aplicação |
 | `Componentes_BE` | bloco 2 na base econômica |
 | `Familias` | bloco 2 nas sete famílias e quatro camadas |
+| `Componentes_unidade` | bloco 2 por linha × unidade (E/D) × camada (BE, CVA, FIN), em MR$, com o volume da unidade (MWh ou MW); a soma fecha com o bloco 2 TA (assert). Lida pelo relatório BIP/FCT (`SP/BW/3-Py/1-Entrega/relatorio_energia_bip_fct.py`) |
 | `Resumo` | MWh, valor e tarifa média por origem, mercado e classe |
 | `Nao_tarifaveis` | PIS/COFINS, reativo e bandeira por mercado e classe |
 | `Conciliacao`, `Conciliacao_Base_RNF` | fechamento com a `Base RNF` |

@@ -62,7 +62,7 @@ SP/RNF/
 | Pasta / arquivo | Para que serve |
 |---|---|
 | [`1-Entrega/Abertura_RNF.ipynb`](1-Entrega/Abertura_RNF.ipynb) | O processo completo: lê o ZUBIL e os ajustes manuais, valoriza pela tarifa homologada, leva ao valor registrado, concilia e grava as duas saídas. |
-| `1-Entrega/rnf/rnf_<ref>.xlsx` | Relatório detalhado. `Provisao`, `Estorno`, `Saldo` e `Saldo_YTD` por origem, mercado, classe, subgrupo e modalidade, com os 37 itens e as famílias; `Componentes`, `Componentes_BE` e `Familias` linha a linha; `Resumo`; `Nao_tarifaveis`; conciliações; `Layout_base` (fonte do estorno do mês seguinte). |
+| `1-Entrega/rnf/rnf_<ref>.xlsx` | Relatório detalhado. `Provisao`, `Estorno`, `Saldo` e `Saldo_YTD` por origem, mercado, classe, subgrupo e modalidade, com os 37 itens e as famílias; `Componentes`, `Componentes_BE` e `Familias` linha a linha; `Componentes_unidade` (bloco 2 por linha, unidade e camada, para o relatório BIP/FCT); `Resumo`; `Nao_tarifaveis`; conciliações; `Layout_base` (fonte do estorno do mês seguinte). |
 | `1-Entrega/receita_nao_faturada/receita_nao_faturada_<ref>.xlsx` | Consolidado no layout Receita Faturada (R$ mil): `Provisao`, `Estorno`, `Saldo`, `Saldo_YTD` e `Conferencia`. |
 | [`1-Entrega/procedimentos/PROCEDIMENTO_RNF.md`](1-Entrega/procedimentos/PROCEDIMENTO_RNF.md) | O que cada passo do notebook faz e por quê. |
 | [`3-Py/2-Checks/extrai_zubil_colunas.py`](3-Py/2-Checks/extrai_zubil_colunas.py) | Grava o ZUBIL do mês só com as colunas usadas (`2-Checks/zubil/`): `python 3-Py/2-Checks/extrai_zubil_colunas.py 2026-08`. |
