@@ -11,3 +11,4 @@ Nome padrão: `Release_PxQ_SP_<aaaa-mm-dd>_<commit de origem>_a_<commit de desti
 |---|---|---|
 | `Release_PxQ_SP_2026-11-11_790ecb3_a_aa33832.md` | `790ecb3` (tag `BW-VF-diferencas-solucionadas`, 29/10/2026) | `aa33832` (11/11/2026) – substituído pelo de 12/11, não enviado à TI |
 | `Release_PxQ_SP_2026-11-12_790ecb3_a_1457656.md` | `790ecb3` (tag `BW-VF-diferencas-solucionadas`, 29/10/2026) | `1457656` (12/11/2026) |
+| `Release_PxQ_SP_2026-11-23_1457656_a_e8c8933.md` | `1457656` (tag `envio-TI-2026-11-12`, 12/11/2026) | `e8c8933` (23/11/2026) – última release de mudanças; as próximas serão só de correções |
