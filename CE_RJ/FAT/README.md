@@ -30,7 +30,7 @@ Valores monetários em milhões de reais (MR$), energia em MWh e demanda em MW.
 | APE | Identificado pelo regime de ajuste | `MERCADO` = APE `[A CONFIRMAR]` |
 | SCEE | Códigos de energia compensada no BW | `GD` (NAO, GD1, GD2) e `ENERGIA_COMP*` `[A CONFIRMAR]` |
 | Tarifa proporcional | Calendário de leitura por lote | BT: `LOTE_LEITURA` + calendário; AT: datas de leitura da própria fatura `[A CONFIRMAR]` |
-| Vigências tarifárias | Reajuste anual (julho) | `[CE]` reajuste e recálculo em 2026 (dois PCATs); `[RJ]` `[A PREENCHER]` |
+| Vigências tarifárias | Reajuste anual (julho), uma vigência por ano | `[RJ]` reajuste em 15/03. `[CE]` reajuste em 22/04 e, em 2026, recálculo pelo UBP (Uso do Bem Público) a partir de 26/08/2026, tratado como nova vigência (com tarifa proporcional). Tabela de tarifas comum a RJ e CE (procedimento, Passo 4) |
 | `[A PREENCHER]` | | |
 
 ## 1. Objetivo
@@ -80,10 +80,11 @@ O mesmo de SP (README de SP, seção 3). Registrar aqui só o que for específic
 
 | Distribuidora | Vigência | PCAT | REH | Observação |
 |---|---|---|---|---|
-| CE | 2025 | `39 PCAT Enel CE 2025 V02.xlsx` | `[A PREENCHER]` | |
-| CE | 2026 | `39 PCAT Enel CE 2026 V02_reajuste.xlsx` e `_recalculo.xlsx` | `[A PREENCHER]` | Reajuste e recálculo: confirmar datas de cada vigência |
-| RJ | 2025 | `383 PCAT Enel RJ 2025 V02.xlsx` | `[A PREENCHER]` | |
-| RJ | 2026 | `383 PCAT Enel RJ 2026 V02.xlsx` | `[A PREENCHER]` | |
+| CE | 2025 | `39 PCAT Enel CE 2025 V02.xlsx` | REH 3.445/2025 | 22/04/2025 a 21/04/2026 |
+| CE | 2026 reajuste | `39 PCAT Enel CE 2026 V02_reajuste.xlsx` | REH 3.574/2026 | 22/04/2026 a 25/08/2026 |
+| CE | 2026 recálculo (UBP) | `39 PCAT Enel CE 2026 V02_recalculo.xlsx` | Despacho 3.324/2026 | 26/08/2026 a 21/04/2027 |
+| RJ | 2025 | `383 PCAT Enel RJ 2025 V02.xlsx` | REH 3.435/2025 | 15/03/2025 a 14/03/2026 |
+| RJ | 2026 | `383 PCAT Enel RJ 2026 V02.xlsx` | `[A PREENCHER]` (Nota Técnica 33/2026) | 15/03/2026 a 14/03/2027 |
 | CE e RJ | 2024 | Não recebido (a especificação pede 2024 a 2026) | | Necessário para REFAT antigo |
 
 ## 4. Implementação

@@ -39,11 +39,39 @@ passada, fechando com a receita) é a de SP ("A ideia em uma página") e não é
 
 ## Passo 4 — As tarifas homologadas
 
-- Em SP: `extrai_pcat.py` lê os PCATs e grava `tarifa_long.csv` (todas as vigências e camadas; Desconto
-  Social derivado quando o PCAT não traz).
-- CE e RJ: mesmo script, adaptado para os PCATs de CE e RJ. Tabela comum ao FAT e à RNF de CE e RJ
-  `[A DEFINIR: local, ex. CE_RJ/tbl/tarifas]`. `[CE]` dois PCATs em 2026 (reajuste e recálculo). PCAT 2024
-  não recebido (I1). `[A PREENCHER]`
+Script `common/3-Py/extrai_pcat.py`, comum a RJ e CE (FAT e RNF). Lê os PCATs de cada distribuidora
+(`CE_RJ/FAT/src/PCAT`) e grava uma tabela única, `common/tbl/tarifas/tarifa_long.csv`: uma linha por
+distribuidora, vigência, camada (TA, BE, CVA, FIN) e chave tarifária. A leitura é a mesma de SP (colunas
+pelo nome, FIN = TA − BE − CVA, Desconto Social derivado da Residencial quando o PCAT não o publica).
+
+O que mudou em relação a SP:
+
+- Os arquivos e as vigências são configurados por distribuidora, no próprio script.
+- Cada vigência tem uma identificação própria (`VIGENCIA`). Isso permite duas vigências no mesmo ano, como
+  no CE em 2026 (`2026_reajuste` e `2026_recalculo`).
+- A saída ganhou as colunas `DISTRIBUIDORA` e `VIGENCIA`.
+- TE de suprimento a outras distribuidoras (chaves A4 Distribuição com TE zero): a linha de suprimento das
+  abas de TE é escolhida por distribuidora e acessante. `[RJ]` permissionárias (CERCI, Ceral Araruama,
+  Ceres) pela linha de permissionária, faixa <500GWh; concessionárias (Energisa Minas Rio, Neoenergia
+  Elektro) pela linha de concessionária, faixa "Não se aplica", a única publicada no PCAT 2026 (escolha
+  provisória, ver sessions). `[CE]` o PCAT não tem linha de suprimento: o CE só presta uso da rede à
+  Energisa PB e à Equatorial PI, e a TE dessas chaves fica zero.
+- O item `TE_ANGRA`, novo em 2026, também é lido nas abas de TE de suprimento.
+
+Vigências:
+
+| Distribuidora | `VIGENCIA` | Início | Fim |
+|---|---|---|---|
+| RJ | 2025 | 15/03/2025 | 14/03/2026 |
+| RJ | 2026 | 15/03/2026 | 14/03/2027 |
+| CE | 2025 | 22/04/2025 | 21/04/2026 |
+| CE | 2026_reajuste | 22/04/2026 | 25/08/2026 |
+| CE | 2026_recalculo | 26/08/2026 | 21/04/2027 |
+
+Conferências: TA = BE + CVA + FIN em todas as vigências; vigências contínuas, sem buraco nem sobreposição.
+O script, rodado para SP, reproduz célula a célula a tabela do MVP (`SP/BW/tbl/tarifas/tarifa_long.csv`).
+PCAT 2024 de RJ e CE não recebido (I1): sem tarifa para REFAT com referência anterior a 15/03/2025 (RJ) e
+22/04/2025 (CE).
 
 ## Passo 5 — A quantidade
 
