@@ -25,7 +25,7 @@ Valores monetários em milhões de reais (MR$), energia em MWh e demanda em MW.
 | APE | Linhas de isenção do BW (regime APE) | Sem marcação na base; identificado pela tarifa aplicada na energia fora ponta, igual à tarifa APE do PCAT |
 | Tarifa proporcional | Calendário de leitura por lote | Base sem data de leitura nem mês de referência: tarifa do mês contábil (vigências ponderadas pelos dias do mês) |
 | Vigências tarifárias | Reajuste anual (julho), uma vigência por ano | `[RJ]` reajuste em 15/03. `[CE]` reajuste em 22/04 e, em 2026, recálculo pelo UBP (Uso do Bem Público) a partir de 26/08/2026, tratado como nova vigência. Tabela de tarifas comum a RJ e CE |
-| Lista de exceções | — | Arquivo mensal com toda linha sem associação direta de tarifa e toda divergência de desconto, por conta contrato, para o faturamento indicar a tarifa correta |
+| Lista de exceções | — | Arquivo mensal com toda linha sem associação direta de tarifa e toda divergência de desconto, por conta contrato, para o faturamento indicar a tarifa correta; abas `Geradoras` (nome da usina) e `APE` (confirmação) |
 | Saídas | `pxq_<ref>.xlsx` e `PxQ_regulacao_<ref>.xlsx` | Mesmas abas e colunas de SP, no arquivo `pxq_<UF>_<ref>.xlsx`; muda o conteúdo de três colunas (`Source` = SAMP; `Qtd. Cta.contrato` no lugar de `Linhas de origem`; `Flag Cli.Liv./ Cat.` com a classificação APE e fonte incentivada) e há uma aba a mais (`APE_Fonte_Incentivada`) |
 
 ## 1. Objetivo
@@ -71,7 +71,8 @@ p_x_q/
 | `1-Entrega/Abertura_PxQ.ipynb` | Abertura do faturamento: leitura, chave, tarifa, blocos 1 e 2, conferências e saídas |
 | `1-Entrega/pxq/pxq_<UF>_<ref>.xlsx` | Saída principal, no layout de SP |
 | `1-Entrega/pxq_regulacao/PxQ_regulacao_<UF>_<ref>.xlsx` | Entrega item a item nas camadas BE, CVA e FIN, no layout de SP |
-| `2-Checks/lista_excecoes/lista_excecoes_<UF>_<ref>.xlsx` | Contas contrato sem associação direta de tarifa ou com divergência de desconto, para o faturamento |
+| `3-Py/readme/tabelas_readme.ipynb` | Gera as tabelas da seção 5 do README (`2-Checks/tabelas_readme/tabelas_readme_<UF>.md` e `.xlsx`) |
+| `2-Checks/lista_excecoes/lista_excecoes_<UF>_<ref>.xlsx` | Contas contrato sem associação direta de tarifa ou com divergência de desconto, e as geradoras e os APE a identificar, para o faturamento |
 | `src/LV/<MM>.<AAAA>_SAMP_<UF> LV.XLSX` | Base de livres e geradoras do mês |
 | `2-Checks/Informe_Gestao/Informe_de_Gestão_<AAAAMM>_(Enel Distribuição <UF>).xlsb` | Informe de Gestão do mês |
 
@@ -136,18 +137,43 @@ A Parte II (cativos, base SAMP de documentos) entra no mesmo notebook.
 
 `[RJ]` Livres e geradoras, outubro de 2026 (4.916 documentos, 2.539 contas contrato):
 
-| Item | MR$ |
-|---|---:|
-| Bloco 1 (quantidade × tarifa homologada) | 137,74 |
-| 1ª passada (desconto de fonte incentivada) | −33,12 |
-| 2ª passada | +1,46 |
-| Receita tarifável (bloco 2) | 107,08 |
-| Não tarifável (ICMS, PIS, COFINS, ultrapassagem, Outros) | 57,74 |
-| Total faturado na base | 164,82 |
+Tabelas geradas por `3-Py/readme/tabelas_readme.ipynb` (mesmo formato de SP, só com as linhas válidas para RJ e CE).
+
+Valores absolutos:
+
+| Item | Unidade | out |
+|---|---|---|
+| (a) Receita faturada (base tarifável) | R$ milhões | 107,1 |
+| (b) Bloco 1 (tarifa cheia) | R$ milhões | 137,7 |
+| (c) Diferença a explicar, (b) − (a) | R$ milhões | 30,7 |
+| (d) Tarifa Social (faixa gratuita) | R$ milhões | 0,0 |
+| (e) Isenção APE | R$ milhões | 0,0 |
+| (f) Fonte incentivada (1ª passada) | R$ milhões | −32,1 |
+| (g) 2ª passada, líquida | R$ milhões | 1,5 |
+| (h) Resíduo sem item tarifário | R$ milhões | 0,0 |
+| (i) 2ª passada, bruta | R$ milhões | 2,1 |
+
+Em relação à receita faturada:
+
+| Item | Unidade | out |
+|---|---|---|
+| (c) Diferença a explicar, (b) − (a) | % de (a) | 28,63 |
+| (d) Tarifa Social (faixa gratuita) | % de (a) | 0,00 |
+| (e) Isenção APE | % de (a) | 0,00 |
+| (f) Fonte incentivada (1ª passada) | % de (a) | −30,00 |
+| (g) 2ª passada, líquida | % de (a) | +1,36 |
+| (h) Resíduo sem item tarifário | % de (a) | 0,00 |
+| (i) 2ª passada, bruta | % de (a) | 1,97 |
+
+Além da receita tarifável, a base traz 57,74 MR$ não tarifáveis (ICMS, PIS, COFINS, ultrapassagem e
+Outros), num total faturado de 164,82 MR$. Nos livres não há Tarifa Social; a linha (d) passa a ter valor com os cativos (Parte II).
+A isenção APE é zero porque a base não marca o APE: as contas APE são valorizadas pela tarifa do livre,
+e a diferença para a tarifa APE vai para a 2ª passada (−0,32 MR$).
 
 A 2ª passada concentra-se em dois pontos: as distribuidoras com receita sem quantidade (+1,78 MR$) e os
 clientes APE valorizados pela tarifa do livre (−0,32 MR$). Nos clientes de fonte incentivada, ela é de
-0,002 MR$.
+0,002 MR$. Não há resíduo não ajustável: o refaturamento é separado em estorno e conta nova (Passo 2), e
+cada parte recebe o próprio desconto.
 
 ### 5.2 Validações
 

@@ -13,6 +13,14 @@ logic is the same; what changes:
 
 Adding a new vintage means adding one entry to DISTRIBUIDORAS and re-running this script.
 
+Two sources (key "fonte" of each vintage, default "PCAT"):
+  - "PCAT" : the PCAT workbook of the vintage (current vintages; available right after the REH);
+  - "ANEEL": the open-data set "Componentes Tarifarias da TE e da TUSD" (le_aneel_componentes.py),
+             for the historical vintages. Published monthly with some lag, so it is not used for
+             recent vintages; it has no FIN layer (FIN = TA - BE - CVA). Decided on 28/11/2026,
+             after a full check of the open data against the PCAT vintages RJ 2025/2026 and
+             CE 2025/2026 (identical, except the TE of supply to distributors, see below).
+
 Columns are matched by NAME (header row, row 3 of each PCAT sheet), never by fixed position, so a
 component added or removed by ANEEL between vintages (e.g. TE_ANGRA, introduced in 2026) does not
 break the read -- it is reported below and filled with 0.0 in the vintages where it is absent.
@@ -30,9 +38,12 @@ from pathlib import Path
 import pandas as pd
 import openpyxl
 
+from le_aneel_componentes import le_vigencia as le_vigencia_aneel
+
 ROOT = Path(os.environ.get("PXQ_ROOT", r"C:\python_projects\claude\p_x_q"))
 SAIDA_PADRAO = ROOT / "common" / "tbl" / "tarifas" / "tarifa_long.csv"
 PCAT_CE_RJ = ROOT / "CE_RJ" / "FAT" / "src" / "PCAT"
+ANEEL_DADOS_ABERTOS = ROOT / "CE_RJ" / "docs" / "Tarifas"   # componentes-tarifarias-<year>.parquet
 
 # One entry per PCAT vintage, per distributor. Vintages must be contiguous (no gap, no overlap).
 # Sources of the dates: REH / Notas Tecnicas of each process (see CE_RJ/FAT/README, section 3).
@@ -49,8 +60,17 @@ DISTRIBUIDORAS = {
          "arquivo": ROOT / "SP" / "BW" / "src" / "pcats" / "390 PCAT Enel SP 2026 V02_23junho.xlsx",
          "inicio": dt.date(2026, 7, 4), "fim": dt.date(2027, 7, 3)},
     ],
-    # RJ: annual adjustment on 15/03 (REH 3.435/2025; Nota Tecnica 33/2026). PCAT 2024 not received.
+    # RJ: annual adjustment on 15/03 (REH 3.435/2025; Nota Tecnica 33/2026). 2022: extraordinary
+    # review from 13/07/2022 (REH 3.064/2022, PIS/COFINS refund). 2023: periodic review (REH 3.177/2023).
     "RJ": [
+        {"vigencia": "2022", "ano": 2022, "fonte": "ANEEL",
+         "inicio": dt.date(2022, 3, 15), "fim": dt.date(2022, 7, 12)},
+        {"vigencia": "2022_extraordinaria", "ano": 2022, "fonte": "ANEEL",
+         "inicio": dt.date(2022, 7, 13), "fim": dt.date(2023, 3, 14)},
+        {"vigencia": "2023", "ano": 2023, "fonte": "ANEEL",
+         "inicio": dt.date(2023, 3, 15), "fim": dt.date(2024, 3, 14)},
+        {"vigencia": "2024", "ano": 2024, "fonte": "ANEEL",
+         "inicio": dt.date(2024, 3, 15), "fim": dt.date(2025, 3, 14)},
         {"vigencia": "2025", "ano": 2025,
          "arquivo": PCAT_CE_RJ / "RJ" / "383 PCAT Enel RJ 2025 V02.xlsx",
          "inicio": dt.date(2025, 3, 15), "fim": dt.date(2026, 3, 14)},
@@ -60,8 +80,17 @@ DISTRIBUIDORAS = {
     ],
     # CE: annual adjustment on 22/04 (REH 3.445/2025; REH 3.574/2026). 2026 was recalculated with
     # the UBP funds from 26/08/2026 (Despacho ANEEL 3.324/2026), acting as a new vintage.
-    # PCAT 2024 not received.
+    # 2022: extraordinary review from 13/07/2022 (REH 3.061/2022, PIS/COFINS refund).
+    # 2023: periodic review (REH 3.185/2023).
     "CE": [
+        {"vigencia": "2022", "ano": 2022, "fonte": "ANEEL",
+         "inicio": dt.date(2022, 4, 22), "fim": dt.date(2022, 7, 12)},
+        {"vigencia": "2022_extraordinaria", "ano": 2022, "fonte": "ANEEL",
+         "inicio": dt.date(2022, 7, 13), "fim": dt.date(2023, 4, 21)},
+        {"vigencia": "2023", "ano": 2023, "fonte": "ANEEL",
+         "inicio": dt.date(2023, 4, 22), "fim": dt.date(2024, 4, 21)},
+        {"vigencia": "2024", "ano": 2024, "fonte": "ANEEL",
+         "inicio": dt.date(2024, 4, 22), "fim": dt.date(2025, 4, 21)},
         {"vigencia": "2025", "ano": 2025,
          "arquivo": PCAT_CE_RJ / "CE" / "39 PCAT Enel CE 2025 V02.xlsx",
          "inicio": dt.date(2025, 4, 22), "fim": dt.date(2026, 4, 21)},
@@ -92,6 +121,10 @@ TOTAIS = ["Total TUSD", "Total TE"]
 DS_FAIXA_01 = "Residencial Desconto Social – faixa 01"
 DS_FAIXA_02 = "Residencial Desconto Social – faixa 02"
 ISENTOS_DESCONTO_SOCIAL = ["TUSD_CDE", "TUSD_CDE_COVID", "TE_CDE_GD"]
+# billed since 01/01/2026: vintages that ended before that date get no Desconto Social rows
+INICIO_DESCONTO_SOCIAL = dt.date(2026, 1, 1)
+
+ORIGEM_FONTE = {"PCAT": "PCAT", "ANEEL": "ANEEL_DADOS_ABERTOS"}
 
 
 # TE of the supply to distributors (A4 Distribuição keys). Vintages may publish these keys with
@@ -174,7 +207,6 @@ def le_aba(caminho, aba):
 def deriva_desconto_social(tabela, dist):
     """Add the Desconto Social rows to the vintages whose PCAT does not have them."""
     tabela = tabela.copy()
-    tabela["ORIGEM"] = "PCAT"
     nativas = tabela[tabela["SUBCLASSE"].isin([DS_FAIXA_01, DS_FAIXA_02])]
     modalidades = sorted(nativas["MODALIDADE"].unique())
     if not modalidades:
@@ -186,6 +218,8 @@ def deriva_desconto_social(tabela, dist):
     chave = ["VIGENCIA", "CAMADA"] + ATRIBUTOS
     novas = []
     for vig, g in base.groupby("VIGENCIA"):
+        if g["VIGENCIA_FIM"].iloc[0] < INICIO_DESCONTO_SOCIAL:
+            continue   # benefit did not exist while this vintage was in force
         f2 = g.copy()
         f2["SUBCLASSE"] = DS_FAIXA_02
         f1 = g.copy()
@@ -262,6 +296,12 @@ def completa_te_suprimento(tabela, vigencias, dist):
         sem_te = tabela.loc[alvo & (tabela["CAMADA"] == "TA") & (tabela["Total TE"].abs() < 1e-9), "ACESSANTE"]
         if sem_te.empty:
             continue
+        if v.get("fonte", "PCAT") == "ANEEL":
+            # the open data publishes these keys with TE = 0 and has no TE supply rows; kept as
+            # published (supply to distributors only, no effect on captive or free customers)
+            print(f"{dist} {v['vigencia']}: fonte ANEEL - TE mantida como publicada (zero) para "
+                  f"{sorted(sem_te.unique())}")
+            continue
         sup = le_te_suprimento(v["arquivo"])
         if not sup:
             # no supply row in the TE sheets: the distributor only provides network use (TUSD)
@@ -295,6 +335,40 @@ def completa_te_suprimento(tabela, vigencias, dist):
     return tabela
 
 
+def le_vigencia_pcat(dist, v):
+    """TA, BE and CVA of one vintage from its PCAT workbook, plus FIN = TA - BE - CVA."""
+    camadas, itens_por_aba = {}, {}
+    for camada, aba in ABAS.items():
+        df, itens = le_aba(v["arquivo"], aba)
+        camadas[camada] = df
+        itens_por_aba[camada] = set(itens)
+
+    n = {c: len(camadas[c]) for c in camadas}
+    if len(set(n.values())) != 1:
+        raise ValueError(f"{dist} {v['vigencia']}: numero de linhas nao bate entre TA/BE/CVA: {n}")
+
+    # duplicate-key check per layer
+    for camada, df in camadas.items():
+        dups = df.duplicated(subset=ATRIBUTOS).sum()
+        if dups:
+            print(f"ATENCAO {dist} {v['vigencia']} / {camada}: {dups} chave(s) duplicada(s) na aba")
+
+    itens_desta_vigencia = sorted(set().union(*itens_por_aba.values()))
+    for camada, df in camadas.items():
+        for it in itens_desta_vigencia:
+            if it not in df.columns:
+                df[it] = 0.0
+
+    # FIN = TA - BE - CVA, merged on the 8-attribute key (never positional)
+    m = camadas["TA"].merge(camadas["BE"], on=ATRIBUTOS, suffixes=("", "_BE")) \
+                      .merge(camadas["CVA"], on=ATRIBUTOS, suffixes=("", "_CVA"))
+    fin = camadas["TA"][ATRIBUTOS].copy()
+    for it in TOTAIS + itens_desta_vigencia:
+        fin[it] = m[it] - m[f"{it}_BE"] - m[f"{it}_CVA"]
+    camadas["FIN"] = fin
+    return camadas, itens_desta_vigencia
+
+
 def extrai_distribuidora(dist, vigencias):
     """Long tariff table of one distributor (all its vintages and layers)."""
     blocos = []
@@ -302,37 +376,15 @@ def extrai_distribuidora(dist, vigencias):
     pior_fin_geral = 0.0
 
     for v in vigencias:
-        camadas, itens_por_aba = {}, {}
-        for camada, aba in ABAS.items():
-            df, itens = le_aba(v["arquivo"], aba)
-            camadas[camada] = df
-            itens_por_aba[camada] = set(itens)
-
-        n = {c: len(camadas[c]) for c in camadas}
-        if len(set(n.values())) != 1:
-            raise ValueError(f"{dist} {v['vigencia']}: numero de linhas nao bate entre TA/BE/CVA: {n}")
-
-        # duplicate-key check per layer
-        for camada, df in camadas.items():
-            dups = df.duplicated(subset=ATRIBUTOS).sum()
-            if dups:
-                print(f"ATENCAO {dist} {v['vigencia']} / {camada}: {dups} chave(s) duplicada(s) na aba")
-
-        itens_desta_vigencia = sorted(set().union(*itens_por_aba.values()))
+        fonte = v.get("fonte", "PCAT")
+        if fonte == "ANEEL":
+            larga, itens_desta_vigencia = le_vigencia_aneel(ANEEL_DADOS_ABERTOS, dist, v["inicio"], v["fim"])
+            camadas = {c: g.drop(columns="CAMADA").reset_index(drop=True)
+                       for c, g in larga.groupby("CAMADA")}
+        else:
+            camadas, itens_desta_vigencia = le_vigencia_pcat(dist, v)
         itens_por_vig[v["vigencia"]] = set(itens_desta_vigencia)
-        for camada, df in camadas.items():
-            for it in itens_desta_vigencia:
-                if it not in df.columns:
-                    df[it] = 0.0
-
-        # FIN = TA - BE - CVA, merged on the 8-attribute key (never positional)
         merge_cols = ATRIBUTOS
-        m = camadas["TA"].merge(camadas["BE"], on=merge_cols, suffixes=("", "_BE")) \
-                          .merge(camadas["CVA"], on=merge_cols, suffixes=("", "_CVA"))
-        fin = camadas["TA"][ATRIBUTOS].copy()
-        for it in TOTAIS + itens_desta_vigencia:
-            fin[it] = m[it] - m[f"{it}_BE"] - m[f"{it}_CVA"]
-        camadas["FIN"] = fin
 
         # validation: TA = BE + CVA + FIN, item a item, for this vintage
         chk = camadas["TA"].merge(camadas["BE"], on=merge_cols, suffixes=("", "_BE")) \
@@ -343,7 +395,7 @@ def extrai_distribuidora(dist, vigencias):
             d = (chk[it] - (chk[f"{it}_BE"] + chk[f"{it}_CVA"] + chk[f"{it}_FIN"])).abs().max()
             pior = max(pior, d)
         pior_fin_geral = max(pior_fin_geral, pior)
-        print(f"{dist} {v['vigencia']}: {len(camadas['TA'])} chaves, {len(itens_desta_vigencia)} itens | "
+        print(f"{dist} {v['vigencia']} ({fonte}): {len(camadas['TA'])} chaves, {len(itens_desta_vigencia)} itens | "
               f"TA=BE+CVA+FIN, diferenca maxima {pior:.10f}")
 
         for camada, df in camadas.items():
@@ -354,6 +406,7 @@ def extrai_distribuidora(dist, vigencias):
             df.insert(0, "ANO_VIGENCIA", v["ano"])
             df.insert(0, "VIGENCIA", v["vigencia"])
             df.insert(0, "DISTRIBUIDORA", dist)
+            df["ORIGEM"] = ORIGEM_FONTE[fonte]
             blocos.append(df)
 
     # report item drift between consecutive vintages
@@ -373,7 +426,7 @@ def extrai_distribuidora(dist, vigencias):
     for it in todos_itens:
         if it not in tabela.columns:
             tabela[it] = 0.0
-    tabela = tabela[COLUNAS_ID + ATRIBUTOS + TOTAIS + todos_itens].fillna(0.0)
+    tabela = tabela[COLUNAS_ID + ATRIBUTOS + TOTAIS + todos_itens + ["ORIGEM"]].fillna(0.0)
     tabela = deriva_desconto_social(tabela, dist)
     tabela = completa_te_suprimento(tabela, vigencias, dist)
 
